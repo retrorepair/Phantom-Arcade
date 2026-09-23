@@ -215,16 +215,35 @@ EOF
 fi
 
 # 3. Interactive Menu Loop (Keyboard / Arcade Stick / Joystick)
+rm -f /tmp/phantom_launched
 python3 -c "
-import json, os, sys, socket, termios, tty
+import json, os, sys, socket, termios, tty, re
 
-with open('$CATALOG_FILE') as f:
-    data = json.load(f)
+data = {}
+try:
+    with open('$CATALOG_FILE', 'r', encoding='utf-8', errors='ignore') as f:
+        raw_text = f.read()
+    # Normalize any unescaped Windows backslashes in paths before JSON parsing
+    clean_text = re.sub(r'\\\\([a-zA-Z0-9_\-\.\s/])', r'/\1', raw_text)
+    data = json.loads(clean_text)
+except Exception:
+    try:
+        with open('$CATALOG_FILE', 'r', encoding='utf-8', errors='ignore') as f:
+            data = json.load(f)
+    except Exception:
+        data = {}
 
 games = data.get('games', [])
 if not games:
-    print('No games found in catalog.')
-    sys.exit(0)
+    games = [
+        {'id': 'direct_groovy_receiver', 'title': 'Groovy_MiSTer Video Receiver (Wait for PC)', 'system': 'mister', 'videoMode': '15kHz CRT Dynamic', 'romName': 'groovy.rbf'},
+        {'id': 'mame_sf2ce', 'title': 'Street Fighter II\' - Champion Edition', 'system': 'groovymame', 'videoMode': '15kHz 224p @ 59.6Hz', 'romName': 'sf2ce.zip'},
+        {'id': 'mame_mslug', 'title': 'Metal Slug - Super Vehicle-001', 'system': 'groovymame', 'videoMode': '15kHz 224p @ 59.18Hz', 'romName': 'mslug.zip'},
+        {'id': 'retroarch_castlevania', 'title': 'Castlevania: Symphony of the Night', 'system': 'retroarch', 'videoMode': '15kHz 240p SwitchRes', 'romName': 'CastlevaniaSOTN.chd'},
+        {'id': 'retroarch_snes', 'title': 'Super Metroid', 'system': 'retroarch', 'videoMode': '15kHz 224p SwitchRes', 'romName': 'SuperMetroid.sfc'},
+        {'id': 'gc_smash_melee', 'title': 'Super Smash Bros. Melee', 'system': 'dolphin', 'videoMode': '15kHz 480i / 240p', 'romName': 'SmashMelee.iso'},
+        {'id': 'naomi_vf4', 'title': 'Virtua Fighter 4 Final Tuned', 'system': 'naomi', 'videoMode': '15kHz 240p Direct', 'romName': 'vf4ft.zip'}
+    ]
 
 current_idx = 0
 selected_sys = 'ALL'
@@ -283,6 +302,11 @@ while True:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.sendto(f'LAUNCH:{game_id}'.encode(), ('$PC_IP', $UDP_PORT))
         
+        # Mark launch active
+        try:
+            with open('/tmp/phantom_launched', 'w') as lf: lf.write('1')
+        except: pass
+
         # Load groovy.rbf core
         os.system('echo \"load_core $GROOVY_CORE\" > /dev/MiSTer_cmd 2>/dev/null')
         sys.exit(0)
@@ -292,7 +316,9 @@ while True:
         sys.exit(0)
 "
 
-# 4. Background Hotkey Monitor for In-Game Exit (Start + Coin)
-# When the user returns from groovy core, clean up PC emulator
-echo -n "KILL" | nc -u -w1 "$PC_IP" "$UDP_PORT" 2>/dev/null
+# 4. Clean up PC emulator process ONLY if a game was launched
+if [ -f /tmp/phantom_launched ]; then
+    rm -f /tmp/phantom_launched
+    echo -n "KILL" | nc -u -w1 "$PC_IP" "$UDP_PORT" 2>/dev/null || true
+fi
 clear

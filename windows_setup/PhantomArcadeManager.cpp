@@ -139,6 +139,97 @@ std::wstring GetText(HWND hWnd) {
     return std::wstring(buf.data());
 }
 
+// Helper: UTF-8 and JSON String escaping
+std::string ToJsonString(const std::wstring& wstr) {
+    if (wstr.empty()) return "";
+    int sizeNeeded = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), (int)wstr.size(), NULL, 0, NULL, NULL);
+    std::string s(sizeNeeded, 0);
+    WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), (int)wstr.size(), &s[0], sizeNeeded, NULL, NULL);
+    std::string out = "";
+    for (char c : s) {
+        if (c == '\\') out += "/"; // Convert backslashes to forward slashes: 100% valid in Windows API and zero JSON escape issues!
+        else if (c == '"') out += "\\\"";
+        else if (c == '\n') out += "\\n";
+        else if (c == '\r') out += "\\r";
+        else if (c == '\t') out += "\\t";
+        else out += c;
+    }
+    return out;
+}
+
+std::wstring StringToWstring(const std::string& s) {
+    if (s.empty()) return L"";
+    int sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), NULL, 0);
+    if (sizeNeeded <= 0) return std::wstring(s.begin(), s.end());
+    std::wstring wstr(sizeNeeded, 0);
+    MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), &wstr[0], sizeNeeded);
+    return wstr;
+}
+
+// Robust JSON key-value extractors
+std::string ExtractJsonString(const std::string& json, const std::string& key) {
+    std::string searchKey = "\"" + key + "\"";
+    size_t pos = 0;
+    while ((pos = json.find(searchKey, pos)) != std::string::npos) {
+        size_t colon = json.find(':', pos + searchKey.length());
+        if (colon == std::string::npos) break;
+        size_t quoteStart = json.find('"', colon + 1);
+        if (quoteStart == std::string::npos) break;
+        
+        bool ok = true;
+        for (size_t i = colon + 1; i < quoteStart; ++i) {
+            char ch = json[i];
+            if (ch != ' ' && ch != '\t' && ch != '\r' && ch != '\n') {
+                ok = false;
+                break;
+            }
+        }
+        if (!ok) {
+            pos += searchKey.length();
+            continue;
+        }
+
+        std::string val = "";
+        size_t p = quoteStart + 1;
+        while (p < json.length()) {
+            if (json[p] == '\\' && p + 1 < json.length()) {
+                char nextC = json[p + 1];
+                if (nextC == '\\') { val += '\\'; p += 2; }
+                else if (nextC == '"') { val += '"'; p += 2; }
+                else if (nextC == '/') { val += '/'; p += 2; }
+                else if (nextC == 'n') { val += '\n'; p += 2; }
+                else if (nextC == 'r') { val += '\r'; p += 2; }
+                else if (nextC == 't') { val += '\t'; p += 2; }
+                else { val += nextC; p += 2; }
+            } else if (json[p] == '"') {
+                break;
+            } else {
+                val += json[p++];
+            }
+        }
+        return val;
+    }
+    return "";
+}
+
+int ExtractJsonInt(const std::string& json, const std::string& key, int defaultVal) {
+    std::string searchKey = "\"" + key + "\"";
+    size_t pos = json.find(searchKey);
+    if (pos == std::string::npos) return defaultVal;
+    pos = json.find(':', pos + searchKey.length());
+    if (pos == std::string::npos) return defaultVal;
+    pos++;
+    while (pos < json.length() && (json[pos] == ' ' || json[pos] == '\t' || json[pos] == '\r' || json[pos] == '\n')) pos++;
+    std::string numStr = "";
+    while (pos < json.length() && (isdigit(json[pos]) || json[pos] == '-')) {
+        numStr += json[pos++];
+    }
+    if (!numStr.empty()) {
+        try { return std::stoi(numStr); } catch (...) {}
+    }
+    return defaultVal;
+}
+
 // Helper: Get integer port from edit box with fallback
 int GetPortFromUI() {
     std::wstring portStr = GetText(hEditUdpPort);
@@ -150,15 +241,75 @@ int GetPortFromUI() {
     return 1999;
 }
 
+// Load Configuration from phantom_config.json
+void LoadConfiguration() {
+    std::ifstream in("phantom_config.json");
+    if (!in.is_open()) return;
+    std::stringstream ss;
+    ss << in.rdbuf();
+    std::string json = ss.str();
+    in.close();
+
+    std::string misterIp = ExtractJsonString(json, "mister_client_ip");
+    if (!misterIp.empty()) SetWindowText(hEditMisterIp, StringToWstring(misterIp).c_str());
+
+    int port = ExtractJsonInt(json, "udp_port", 1999);
+    SetWindowText(hEditUdpPort, std::to_wstring(port).c_str());
+
+    // MAME
+    std::string mameExe = ExtractJsonString(json, "mame_exe");
+    if (mameExe.empty()) mameExe = ExtractJsonString(json, "exe");
+    if (!mameExe.empty()) SetWindowText(hEditMameExe, StringToWstring(mameExe).c_str());
+
+    std::string mameRoms = ExtractJsonString(json, "mame_roms");
+    if (mameRoms.empty()) mameRoms = ExtractJsonString(json, "roms");
+    if (!mameRoms.empty()) SetWindowText(hEditMameRoms, StringToWstring(mameRoms).c_str());
+
+    // RetroArch
+    std::string raExe = ExtractJsonString(json, "retroarch_exe");
+    if (!raExe.empty()) SetWindowText(hEditRetroarchExe, StringToWstring(raExe).c_str());
+
+    std::string raRoms = ExtractJsonString(json, "retroarch_roms");
+    if (!raRoms.empty()) SetWindowText(hEditRetroarchRoms, StringToWstring(raRoms).c_str());
+
+    // Dolphin
+    std::string dolphinExe = ExtractJsonString(json, "dolphin_exe");
+    if (!dolphinExe.empty()) SetWindowText(hEditDolphinExe, StringToWstring(dolphinExe).c_str());
+
+    std::string dolphinRoms = ExtractJsonString(json, "dolphin_roms");
+    if (!dolphinRoms.empty()) SetWindowText(hEditGcRoms, StringToWstring(dolphinRoms).c_str());
+
+    // Flycast
+    std::string flycastExe = ExtractJsonString(json, "flycast_exe");
+    if (!flycastExe.empty()) SetWindowText(hEditFlycastExe, StringToWstring(flycastExe).c_str());
+
+    std::string flycastRoms = ExtractJsonString(json, "flycast_roms");
+    if (!flycastRoms.empty()) SetWindowText(hEditNaomiRoms, StringToWstring(flycastRoms).c_str());
+
+    // PCSX2
+    std::string pcsx2Exe = ExtractJsonString(json, "pcsx2_exe");
+    if (!pcsx2Exe.empty()) SetWindowText(hEditPcsx2Exe, StringToWstring(pcsx2Exe).c_str());
+
+    std::string pcsx2Roms = ExtractJsonString(json, "pcsx2_roms");
+    if (!pcsx2Roms.empty()) SetWindowText(hEditPs2Roms, StringToWstring(pcsx2Roms).c_str());
+
+    SetWindowText(hStaticStatus, L"Status: Loaded saved configuration from phantom_config.json.");
+}
+
 // Save Configuration to phantom_config.json
 void SaveConfiguration() {
     std::wstring misterIp = GetText(hEditMisterIp);
     int port = GetPortFromUI();
     std::wstring mameExe = GetText(hEditMameExe);
+    std::wstring mameRoms = GetText(hEditMameRoms);
     std::wstring raExe = GetText(hEditRetroarchExe);
+    std::wstring raRoms = GetText(hEditRetroarchRoms);
     std::wstring dolphinExe = GetText(hEditDolphinExe);
+    std::wstring dolphinRoms = GetText(hEditGcRoms);
     std::wstring flycastExe = GetText(hEditFlycastExe);
+    std::wstring flycastRoms = GetText(hEditNaomiRoms);
     std::wstring pcsx2Exe = GetText(hEditPcsx2Exe);
+    std::wstring pcsx2Roms = GetText(hEditPs2Roms);
 
     std::ofstream out("phantom_config.json");
     if (out.is_open()) {
@@ -167,31 +318,48 @@ void SaveConfiguration() {
         out << "    \"listen_ip\": \"0.0.0.0\",\n";
         out << "    \"udp_port\": " << port << ",\n";
         out << "    \"http_port\": 8088,\n";
-        out << "    \"mister_client_ip\": \"" << std::string(misterIp.begin(), misterIp.end()) << "\"\n";
+        out << "    \"mister_client_ip\": \"" << ToJsonString(misterIp) << "\"\n";
+        out << "  },\n";
+        out << "  \"paths\": {\n";
+        out << "    \"mame_exe\": \"" << ToJsonString(mameExe) << "\",\n";
+        out << "    \"mame_roms\": \"" << ToJsonString(mameRoms) << "\",\n";
+        out << "    \"retroarch_exe\": \"" << ToJsonString(raExe) << "\",\n";
+        out << "    \"retroarch_roms\": \"" << ToJsonString(raRoms) << "\",\n";
+        out << "    \"dolphin_exe\": \"" << ToJsonString(dolphinExe) << "\",\n";
+        out << "    \"dolphin_roms\": \"" << ToJsonString(dolphinRoms) << "\",\n";
+        out << "    \"flycast_exe\": \"" << ToJsonString(flycastExe) << "\",\n";
+        out << "    \"flycast_roms\": \"" << ToJsonString(flycastRoms) << "\",\n";
+        out << "    \"pcsx2_exe\": \"" << ToJsonString(pcsx2Exe) << "\",\n";
+        out << "    \"pcsx2_roms\": \"" << ToJsonString(pcsx2Roms) << "\"\n";
         out << "  },\n";
         out << "  \"emulators\": {\n";
         out << "    \"groovymame\": {\n";
-        out << "      \"exe\": \"" << std::string(mameExe.begin(), mameExe.end()) << "\",\n";
-        out << "      \"args\": \"-video mister -mister_ip " << std::string(misterIp.begin(), misterIp.end()) << " -mister_port " << port << " \\\"{rom_stem}\\\"\",\n";
+        out << "      \"exe\": \"" << ToJsonString(mameExe) << "\",\n";
+        out << "      \"roms\": \"" << ToJsonString(mameRoms) << "\",\n";
+        out << "      \"args\": \"-video mister -mister_ip " << ToJsonString(misterIp) << " -mister_port " << port << " \\\"{rom_stem}\\\"\",\n";
         out << "      \"pipeline\": \"Groovy_MiSTer SwitchRes 15kHz Direct\"\n";
         out << "    },\n";
         out << "    \"retroarch\": {\n";
-        out << "      \"exe\": \"" << std::string(raExe.begin(), raExe.end()) << "\",\n";
+        out << "      \"exe\": \"" << ToJsonString(raExe) << "\",\n";
+        out << "      \"roms\": \"" << ToJsonString(raRoms) << "\",\n";
         out << "      \"args\": \"-f \\\"{rom}\\\"\",\n";
         out << "      \"pipeline\": \"RetroArch CRT SwitchRes 15kHz\"\n";
         out << "    },\n";
         out << "    \"dolphin\": {\n";
-        out << "      \"exe\": \"" << std::string(dolphinExe.begin(), dolphinExe.end()) << "\",\n";
+        out << "      \"exe\": \"" << ToJsonString(dolphinExe) << "\",\n";
+        out << "      \"roms\": \"" << ToJsonString(dolphinRoms) << "\",\n";
         out << "      \"args\": \"-b -e \\\"{rom}\\\"\",\n";
         out << "      \"pipeline\": \"Groovy_MiSTer 480i/240p\"\n";
         out << "    },\n";
         out << "    \"flycast\": {\n";
-        out << "      \"exe\": \"" << std::string(flycastExe.begin(), flycastExe.end()) << "\",\n";
+        out << "      \"exe\": \"" << ToJsonString(flycastExe) << "\",\n";
+        out << "      \"roms\": \"" << ToJsonString(flycastRoms) << "\",\n";
         out << "      \"args\": \"\\\"{rom}\\\"\",\n";
         out << "      \"pipeline\": \"SwitchRes Direct 15kHz\"\n";
         out << "    },\n";
         out << "    \"pcsx2\": {\n";
-        out << "      \"exe\": \"" << std::string(pcsx2Exe.begin(), pcsx2Exe.end()) << "\",\n";
+        out << "      \"exe\": \"" << ToJsonString(pcsx2Exe) << "\",\n";
+        out << "      \"roms\": \"" << ToJsonString(pcsx2Roms) << "\",\n";
         out << "      \"args\": \"-batch -fullscreen \\\"{rom}\\\"\",\n";
         out << "      \"pipeline\": \"Custom Pipeline (Experimental)\"\n";
         out << "    }\n";
@@ -245,6 +413,8 @@ void ScanRomDirectories() {
                         std::string filename = entry.path().filename().string();
                         std::string stem = entry.path().stem().string();
                         std::string id = target.system + "_" + stem;
+                        // generic_string() ensures forward slashes: zero JSON escape issues!
+                        std::string cleanRomPath = entry.path().generic_string();
 
                         // Add to UI listbox
                         std::wstring listEntry = L"[" + std::wstring(target.system.begin(), target.system.end()) + L"] " +
@@ -259,7 +429,7 @@ void ScanRomDirectories() {
                         catOut << "      \"system\": \"" << target.system << "\",\n";
                         catOut << "      \"systemName\": \"" << target.systemName << "\",\n";
                         catOut << "      \"romName\": \"" << filename << "\",\n";
-                        catOut << "      \"romPath\": \"" << entry.path().string() << "\",\n";
+                        catOut << "      \"romPath\": \"" << cleanRomPath << "\",\n";
                         catOut << "      \"videoMode\": \"" << target.videoMode << "\",\n";
                         catOut << "      \"resolution\": \"" << target.resolution << "\"\n";
                         catOut << "    }";
@@ -287,7 +457,7 @@ void ScanRomDirectories() {
                << "      \"system\": \"groovymame\",\n"
                << "      \"systemName\": \"GroovyMAME Arcade\",\n"
                << "      \"romName\": \"sf2ce.zip\",\n"
-               << "      \"romPath\": \"C:\\\\Games\\\\Arcade\\\\sf2ce.zip\",\n"
+               << "      \"romPath\": \"C:/Games/Arcade/sf2ce.zip\",\n"
                << "      \"videoMode\": \"15kHz 224p @ 59.6Hz\",\n"
                << "      \"resolution\": \"384x224\"\n"
                << "    },\n"
@@ -297,7 +467,7 @@ void ScanRomDirectories() {
                << "      \"system\": \"groovymame\",\n"
                << "      \"systemName\": \"GroovyMAME Arcade\",\n"
                << "      \"romName\": \"mslug.zip\",\n"
-               << "      \"romPath\": \"C:\\\\Games\\\\Arcade\\\\mslug.zip\",\n"
+               << "      \"romPath\": \"C:/Games/Arcade/mslug.zip\",\n"
                << "      \"videoMode\": \"15kHz 224p @ 59.18Hz\",\n"
                << "      \"resolution\": \"320x224\"\n"
                << "    },\n"
@@ -307,7 +477,7 @@ void ScanRomDirectories() {
                << "      \"system\": \"retroarch\",\n"
                << "      \"systemName\": \"RetroArch SwitchRes\",\n"
                << "      \"romName\": \"CastlevaniaSOTN.chd\",\n"
-               << "      \"romPath\": \"C:\\\\Games\\\\RetroArch\\\\CastlevaniaSOTN.chd\",\n"
+               << "      \"romPath\": \"C:/Games/RetroArch/CastlevaniaSOTN.chd\",\n"
                << "      \"videoMode\": \"15kHz 240p SwitchRes\",\n"
                << "      \"resolution\": \"256x240\"\n"
                << "    },\n"
@@ -317,7 +487,7 @@ void ScanRomDirectories() {
                << "      \"system\": \"dolphin\",\n"
                << "      \"systemName\": \"GameCube / Wii\",\n"
                << "      \"romName\": \"SmashMelee.iso\",\n"
-               << "      \"romPath\": \"C:\\\\Games\\\\GameCube\\\\SmashMelee.iso\",\n"
+               << "      \"romPath\": \"C:/Games/GameCube/SmashMelee.iso\",\n"
                << "      \"videoMode\": \"15kHz 480i / 240p\",\n"
                << "      \"resolution\": \"640x480i\"\n"
                << "    }\n";
@@ -685,6 +855,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         // Status Bar
         y += 118;
         hStaticStatus = CreateWindow(L"STATIC", L"Status: Ready. Default MiSTer port is 1999. Integrated HTTP :8088.", WS_CHILD | WS_VISIBLE | SS_LEFTNOWORDWRAP, 20, y, 620, 20, hWnd, (HMENU)IDC_STATIC_STATUS, hInst, NULL);
+        LoadConfiguration();
         break;
     }
 
@@ -809,6 +980,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     ShowWindow(hMainWnd, nCmdShow);
     UpdateWindow(hMainWnd);
+
+    // Load any saved configuration from phantom_config.json
+    LoadConfiguration();
 
     // Automatically configure Windows Firewall and start the daemon immediately
     EnsureFirewallRules();
