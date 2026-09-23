@@ -15,29 +15,32 @@ if [ -f "$CONFIG_FILE" ]; then
     PC_IP=$(grep -E "^PC_SERVER_IP=" "$CONFIG_FILE" | cut -d'=' -f2 | tr -d ' \r\n')
 fi
 
-# 1. If native framebuffer graphical frontend is present, launch it!
+# 1. Launch native framebuffer graphical frontend in a persistent loop
 if [ -x "$FRONTEND_BIN" ]; then
-    echo "[+] Launching Phantom Arcade Graphical Framebuffer CRT UI..."
-    setterm -cursor off > /dev/tty0 2>/dev/null
-    stty -echo < /dev/tty0 2>/dev/null
-    clear > /dev/tty0 2>/dev/null
-    "$FRONTEND_BIN" "$PC_IP"
-    setterm -cursor on > /dev/tty0 2>/dev/null
-    stty echo < /dev/tty0 2>/dev/null
-    exit 0
+    while true; do
+        setterm -cursor off > /dev/tty0 2>/dev/null
+        stty -echo < /dev/tty0 2>/dev/null
+        clear > /dev/tty0 2>/dev/null
+        "$FRONTEND_BIN" "$PC_IP"
+        RET=$?
+        if [ $RET -eq 99 ]; then
+            # User explicitly requested exit to MiSTer Menu
+            echo "load_core /media/fat/menu.rbf" > /dev/MiSTer_cmd
+            exit 0
+        fi
+        # When returning from Groovy.rbf / game exit, loop right back to Phantom Arcade menu!
+        sleep 0.5
+    done
 fi
 
-# 2. If user has core installed, switch directly to Groovy RBF core
+# 2. Fallback if frontend binary is missing
 if [ -f "$GROOVY_CORE_ARCADE" ]; then
-    echo "[+] Loading Groovy RBF core from Arcade folder..."
     echo "load_core $GROOVY_CORE_ARCADE" > /dev/MiSTer_cmd
     exit 0
 elif [ -f "$GROOVY_CORE_UTILITY" ]; then
-    echo "[+] Loading Groovy RBF core from Utility folder..."
     echo "load_core $GROOVY_CORE_UTILITY" > /dev/MiSTer_cmd
     exit 0
 fi
 
 echo "[!] Groovy.rbf core not found."
-echo "Please copy Groovy.rbf into /media/fat/_Utility/ or /media/fat/_Arcade/"
 exit 1
