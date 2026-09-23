@@ -661,11 +661,13 @@ bool ExecuteLaunchProcess(const std::string& gameId, const std::wstring& targetM
         }
     }
 
+    // Set MISTER_IP environment variable for SwitchRes video mister backend
+    SetEnvironmentVariableW(L"MISTER_IP", misterIp.c_str());
+
     // Default to GroovyMAME with Calamity 15kHz MiSTer Video Streaming & Dynamic SwitchRes (Full screen stretch without side pillarbox black bars)
     std::wstring wStem = StringToWstring(stem);
     std::wstring cmd = L"\"" + mameExe + L"\" " + wStem + 
-                       L" -video mister -mister_ip " + misterIp + 
-                       L" -switchres 1 -resolution auto -keepaspect 0 -skip_gameinfo";
+                       L" -video mister -switchres 1 -resolution auto -keepaspect 0 -skip_gameinfo";
 
     if (!mameRoms.empty()) {
         cmd += L" -rompath \"" + mameRoms + L"\"";
