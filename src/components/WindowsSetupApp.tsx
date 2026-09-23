@@ -89,7 +89,7 @@ export const WindowsSetupApp: React.FC = () => {
       emulators: {
         groovymame: {
           exe: mameExe,
-          args: `-video mister -mister_ip ${misterIp} -mister_port ${activePort} "{rom_stem}"`,
+          args: `-video mister -mister_ip ${misterIp} -skip_gameinfo "{rom_stem}"`,
           pipeline: 'Groovy_MiSTer SwitchRes 15kHz Direct',
           roms_dir: mameRoms
         },
@@ -324,7 +324,7 @@ export const WindowsSetupApp: React.FC = () => {
                     </span>
                   </div>
                   <span className="text-[10px] text-neutral-400 font-mono hidden sm:inline">
-                    -video mister -mister_port {udpPort}
+                    -video mister -mister_ip {misterIp}
                   </span>
                 </div>
                 

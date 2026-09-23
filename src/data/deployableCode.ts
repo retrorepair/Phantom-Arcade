@@ -60,7 +60,7 @@ def load_config():
         "emulators": {
             "mame": {
                 "exe": "C:\\\\Emulators\\\\GroovyMAME\\\\groovymame64.exe",
-                "args": "-video mister -mister_ip {mister_ip} -mister_port {udp_port} \\\"{rom_stem}\\\""
+                "args": "-video mister -mister_ip {mister_ip} -skip_gameinfo \\\"{rom_stem}\\\""
             },
             "retroarch": {
                 "exe": "C:\\\\Emulators\\\\RetroArch\\\\retroarch.exe",

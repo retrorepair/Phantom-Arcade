@@ -7,7 +7,7 @@ export const DEFAULT_EMULATORS: EmulatorProfile[] = [
     system: 'mame',
     executableName: 'groovymame64.exe',
     defaultExecutablePath: 'C:\\Emulators\\GroovyMAME\\groovymame64.exe',
-    commandTemplate: '{exe} -video mister -mister_ip {mister_ip} -mister_port {mister_port} {rom_stem}',
+    commandTemplate: '{exe} -video mister -mister_ip {mister_ip} -skip_gameinfo {rom_stem}',
     videoPipeline: 'Groovy_MiSTer SwitchRes 15kHz Direct',
     killMethod: 'taskkill',
     notes: 'Direct native Groovy_MiSTer network streaming. Dynamically switches pixel-accurate arcade modelines on your CRT (CPS1/2/3, NeoGeo, Cave, Midway).'

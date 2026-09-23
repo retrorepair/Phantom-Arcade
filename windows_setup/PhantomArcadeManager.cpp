@@ -446,7 +446,7 @@ void SaveConfiguration() {
         out << "    \"groovymame\": {\n";
         out << "      \"exe\": \"" << ToJsonString(mameExe) << "\",\n";
         out << "      \"roms\": \"" << ToJsonString(mameRoms) << "\",\n";
-        out << "      \"args\": \"-video mister -mister_ip " << ToJsonString(misterIp) << " -mister_port " << port << " \\\"{rom_stem}\\\"\",\n";
+        out << "      \"args\": \"-video mister -mister_ip " << ToJsonString(misterIp) << " \\\"{rom_stem}\\\"\",\n";
         out << "      \"pipeline\": \"Groovy_MiSTer SwitchRes 15kHz Direct\"\n";
         out << "    },\n";
         out << "    \"retroarch\": {\n";
@@ -639,7 +639,7 @@ bool LaunchGame(const std::string& gameId, const std::wstring& targetMisterIp) {
     std::wstring wStem = StringToWstring(stem);
     std::wstring cmd = L"\"" + mameExe + L"\" " + wStem + 
                        L" -video mister -mister_ip " + misterIp + 
-                       L" -mister_port " + std::to_wstring(port);
+                       L" -skip_gameinfo";
 
     if (!mameRoms.empty()) {
         cmd += L" -rompath \"" + mameRoms + L"\"";
