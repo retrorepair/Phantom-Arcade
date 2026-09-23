@@ -57,10 +57,11 @@ def load_config():
     default_config = {
         "mister_ip": "192.168.1.50",
         "udp_port": 1999,
+        "launch_delay_sec": 6,
         "emulators": {
             "mame": {
                 "exe": "C:\\\\Emulators\\\\GroovyMAME\\\\groovymame64.exe",
-                "args": "-video mister -mister_ip {mister_ip} -skip_gameinfo \\\"{rom_stem}\\\""
+                "args": "-video mister -mister_ip {mister_ip} -switchres 1 -resolution auto -keepaspect 0 -skip_gameinfo {rom_stem}"
             },
             "retroarch": {
                 "exe": "C:\\\\Emulators\\\\RetroArch\\\\retroarch.exe",
@@ -96,6 +97,12 @@ def load_config():
 def kill_active_emulator():
     global current_process
     with process_lock:
+        # Aggressively kill any leftover MAME/RetroArch instances
+        if os.name == 'nt':
+            subprocess.run(["taskkill", "/F", "/IM", "mame.exe"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL, check=False)
+            subprocess.run(["taskkill", "/F", "/IM", "groovymame.exe"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL, check=False)
+            subprocess.run(["taskkill", "/F", "/IM", "retroarch.exe"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL, check=False)
+
         if current_process and current_process.poll() is None:
             pid = current_process.pid
             print(f"[*] Terminating active emulator process (PID: {pid})...")
@@ -138,11 +145,21 @@ def launch_game(game_id, catalog, config):
     exe_path = emu_cfg.get("exe")
     arg_template = emu_cfg.get("args")
     rom_path = game.get("romPath")
+    rom_stem = game.get("stem") or game_id
     
-    cmd_str = arg_template.format(exe=exe_path, rom=rom_path)
+    cmd_str = arg_template.format(exe=exe_path, rom=rom_path, rom_stem=rom_stem, mister_ip=config.get("mister_ip", "192.168.1.50"))
     full_cmd = f'"{exe_path}" {cmd_str}' if not cmd_str.startswith('"' + exe_path) else cmd_str
     
+    delay_sec = config.get("launch_delay_sec", 6)
+    if delay_sec < 6:
+        delay_sec = 6
+
     print(f"[+] LAUNCHING: {game['title']} ({game['systemName']})")
+    print(f"[+] Waiting {delay_sec}s for MiSTer FPGA Groovy.rbf core re-configuration...")
+    for s in range(delay_sec, 0, -1):
+        print(f"[*] FPGA reconfiguring... launching PC stream in {s}s")
+        time.sleep(1)
+
     print(f"[+] Command: {full_cmd}")
     
     with process_lock:
