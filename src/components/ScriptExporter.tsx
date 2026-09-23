@@ -215,12 +215,13 @@ export const ScriptExporter: React.FC = () => {
             <button
               onClick={() => {
                 navigator.clipboard.writeText('curl -k -sSL https://raw.githubusercontent.com/retrorepair/Phantom-Arcade/main/mister_client/install_mister.sh | bash');
-                alert('Copied 1-line auto-installer to clipboard:\n\ncurl -k -sSL https://raw.githubusercontent.com/retrorepair/Phantom-Arcade/main/mister_client/install_mister.sh | bash');
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
               }}
               className="w-full py-1.5 px-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-100 font-bold text-[11px] rounded font-mono flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
-              <Copy className="w-3 h-3 text-amber-400" />
-              <span>Copy Curl Command</span>
+              {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-amber-400" />}
+              <span>{copied ? 'Copied to Clipboard!' : 'Copy Curl Command'}</span>
             </button>
           </div>
         </div>
