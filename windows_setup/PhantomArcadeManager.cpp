@@ -656,14 +656,9 @@ bool ExecuteLaunchProcess(const std::string& gameId, const std::wstring& targetM
         }
     }
 
-    // Default to GroovyMAME with Calamity 15kHz MiSTer Video Streaming & Dynamic SwitchRes (Full screen stretch without side pillarbox black bars)
+    // Default to GroovyMAME with user configuration handled in mame.ini
     std::wstring wStem = StringToWstring(stem);
-    std::wstring cmd = L"\"" + mameExe + L"\" " + wStem + 
-                       L" -video mister -switchres 1 -resolution auto -keepaspect 0 -skip_gameinfo";
-
-    if (!mameRoms.empty()) {
-        cmd += L" -rompath \"" + mameRoms + L"\"";
-    }
+    std::wstring cmd = L"\"" + mameExe + L"\" " + wStem + L" -skip_gameinfo";
 
     STARTUPINFO si = { sizeof(si) };
     PROCESS_INFORMATION pi = { 0 };

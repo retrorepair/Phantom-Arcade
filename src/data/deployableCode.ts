@@ -61,7 +61,7 @@ def load_config():
         "emulators": {
             "mame": {
                 "exe": "C:\\\\Emulators\\\\GroovyMAME\\\\groovymame64.exe",
-                "args": "-video mister -switchres 1 -resolution auto -keepaspect 0 -skip_gameinfo {rom_stem}"
+                "args": "{rom_stem} -skip_gameinfo"
             },
             "retroarch": {
                 "exe": "C:\\\\Emulators\\\\RetroArch\\\\retroarch.exe",
