@@ -463,7 +463,7 @@ void SaveConfiguration() {
         out << "    \"groovymame\": {\n";
         out << "      \"exe\": \"" << ToJsonString(mameExe) << "\",\n";
         out << "      \"roms\": \"" << ToJsonString(mameRoms) << "\",\n";
-        out << "      \"args\": \"-video mister -mister_ip " << ToJsonString(misterIp) << " -switchres 1 -resolution auto \\\"{rom_stem}\\\"\",\n";
+        out << "      \"args\": \"\\\"{rom_stem}\\\" -video mister -skip_gameinfo -nokeepaspect\",\n";
         out << "      \"pipeline\": \"Groovy_MiSTer SwitchRes 15kHz Direct\"\n";
         out << "    },\n";
         out << "    \"retroarch\": {\n";
