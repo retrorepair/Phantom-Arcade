@@ -656,9 +656,9 @@ bool ExecuteLaunchProcess(const std::string& gameId, const std::wstring& targetM
         }
     }
 
-    // Default to GroovyMAME with user configuration handled in mame.ini
+    // Default to GroovyMAME with video mister, skip gameinfo, and nokeepaspect to prevent narrow pillarbox screen width
     std::wstring wStem = StringToWstring(stem);
-    std::wstring cmd = L"\"" + mameExe + L"\" " + wStem + L" -skip_gameinfo";
+    std::wstring cmd = L"\"" + mameExe + L"\" " + wStem + L" -video mister -skip_gameinfo -nokeepaspect";
 
     STARTUPINFO si = { sizeof(si) };
     PROCESS_INFORMATION pi = { 0 };
