@@ -656,11 +656,11 @@ bool ExecuteLaunchProcess(const std::string& gameId, const std::wstring& targetM
         }
     }
 
-    // Default to GroovyMAME with Calamity 15kHz MiSTer Video Streaming & Dynamic SwitchRes
+    // Default to GroovyMAME with Calamity 15kHz MiSTer Video Streaming & Dynamic SwitchRes (Full screen stretch without side pillarbox black bars)
     std::wstring wStem = StringToWstring(stem);
     std::wstring cmd = L"\"" + mameExe + L"\" " + wStem + 
                        L" -video mister -mister_ip " + misterIp + 
-                       L" -switchres 1 -resolution auto -skip_gameinfo";
+                       L" -switchres 1 -resolution auto -keepaspect 0 -skip_gameinfo";
 
     if (!mameRoms.empty()) {
         cmd += L" -rompath \"" + mameRoms + L"\"";
@@ -725,13 +725,23 @@ static DWORD WINAPI DelayedLaunchWorker(LPVOID lpParam) {
     return 0;
 }
 
-// Public LaunchGame function: ALWAYS invokes the delayed worker thread (default 6 seconds) with re-entrancy guard
+// Public LaunchGame function: ALWAYS invokes the delayed worker thread (default 6 seconds) with thread-safe critical section guard
 bool LaunchGame(const std::string& gameId, const std::wstring& targetMisterIp) {
+    static CRITICAL_SECTION cs;
+    static bool init = false;
+    if (!init) {
+        InitializeCriticalSection(&cs);
+        init = true;
+    }
+
+    EnterCriticalSection(&cs);
     if (g_launchInProgress.load()) {
+        LeaveCriticalSection(&cs);
         SetWindowText(hStaticStatus, L"Status: Launch already in progress. Please wait...");
         return false;
     }
     g_launchInProgress.store(true);
+    LeaveCriticalSection(&cs);
 
     int delaySec = 6;
     if (hEditLaunchDelay != NULL) {
