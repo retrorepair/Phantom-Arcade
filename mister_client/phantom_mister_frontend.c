@@ -859,7 +859,7 @@ int main(int argc, char *argv[]) {
                             const char *coreToLoad = (access(GROOVY_CORE_ARCADE, F_OK) == 0) ? GROOVY_CORE_ARCADE : GROOVY_CORE_UTILITY;
 
                             char statusMsg[128];
-                            snprintf(statusMsg, sizeof(statusMsg), "Switching FPGA to Groovy.rbf... Stream starts in %ds", core_launch_delay);
+                            snprintf(statusMsg, sizeof(statusMsg), "Switching FPGA to Groovy.rbf... PC starting in 3s");
                             show_launch_splash(games[activeGame].title, statusMsg);
 
                             char targetGameId[64];
@@ -870,17 +870,14 @@ int main(int argc, char *argv[]) {
                             // Because MiSTer blocks while Phantom_Arcade.sh is running,
                             // Phantom_Arcade.sh MUST exit immediately so MiSTer unblocks and
                             // reprograms the Cyclone V FPGA with Groovy.rbf!
-                            // This background child daemon sleeps during the FPGA flashing period (default 4s),
-                            // then triggers the PC emulator right as the receiver core is ready.
+                            // The detached child sends the launch datagram with 3s PC-side delay.
                             pid_t pid = fork();
                             if (pid == 0) {
                                 setsid();
                                 for (int fd = 0; fd < 64; fd++) {
                                     close(fd);
                                 }
-                                if (core_launch_delay > 0) {
-                                    sleep(core_launch_delay);
-                                }
+                                usleep(250000); // 250ms grace period so parent unblocks MiSTer FIFO
                                 send_udp_launch(targetGameId);
                                 _exit(0);
                             }

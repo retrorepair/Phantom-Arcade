@@ -78,11 +78,12 @@ namespace fs = std::filesystem;
 #define IDC_STATIC_STATUS           127
 #define IDC_LIST_GAMES              128
 #define IDC_BTN_LAUNCH_GAME         129
+#define IDC_EDIT_LAUNCH_DELAY       130
 
 // Global State
 HINSTANCE hInst = NULL;
 HWND hMainWnd = NULL;
-HWND hEditMisterIp, hEditUdpPort;
+HWND hEditMisterIp, hEditUdpPort, hEditLaunchDelay;
 HWND hEditMameExe, hEditMameRoms;
 HWND hEditRetroarchExe, hEditRetroarchRoms;
 HWND hEditDolphinExe, hEditGcRoms;
@@ -340,6 +341,11 @@ void LoadConfiguration() {
     int port = ExtractJsonInt(json, "udp_port", RegReadInt(L"udp_port", 1999));
     SetWindowText(hEditUdpPort, std::to_wstring(port).c_str());
 
+    // 2b. PC-side Launch Delay (default: 3 seconds to let FPGA bitstream reconfigure)
+    int delaySec = ExtractJsonInt(json, "launch_delay_sec", RegReadInt(L"launch_delay_sec", 3));
+    if (delaySec < 1) delaySec = 3;
+    SetWindowText(hEditLaunchDelay, std::to_wstring(delaySec).c_str());
+
     // 3. GroovyMAME Executable & ROMs
     std::string mameExe = ExtractJsonString(json, "mame_exe");
     if (mameExe.empty()) mameExe = ExtractJsonString(json, "exe");
@@ -408,6 +414,16 @@ void SaveConfiguration() {
     // Save to Windows Registry
     RegWriteString(L"mister_client_ip", misterIp);
     RegWriteInt(L"udp_port", port);
+
+    int launchDelay = 3;
+    if (hEditLaunchDelay != NULL) {
+        std::wstring dStr = GetText(hEditLaunchDelay);
+        if (!dStr.empty()) {
+            try { launchDelay = std::stoi(dStr); } catch (...) {}
+        }
+    }
+    if (launchDelay < 1) launchDelay = 3;
+    RegWriteInt(L"launch_delay_sec", launchDelay);
     RegWriteString(L"mame_exe", mameExe);
     RegWriteString(L"mame_roms", mameRoms);
     RegWriteString(L"retroarch_exe", raExe);
@@ -427,6 +443,7 @@ void SaveConfiguration() {
         out << "  \"server\": {\n";
         out << "    \"listen_ip\": \"0.0.0.0\",\n";
         out << "    \"udp_port\": " << port << ",\n";
+        out << "    \"launch_delay_sec\": " << launchDelay << ",\n";
         out << "    \"http_port\": 8088,\n";
         out << "    \"mister_client_ip\": \"" << ToJsonString(misterIp) << "\"\n";
         out << "  },\n";
@@ -745,13 +762,20 @@ struct DelayedLaunchInfo {
 
 static DWORD WINAPI DelayedLaunchThread(LPVOID lpParam) {
     DelayedLaunchInfo* info = (DelayedLaunchInfo*)lpParam;
-    for (int s = info->delaySec; s > 0; --s) {
-        std::wstring st = L"Status: MiSTer core initializing... Launching in " + std::to_wstring(s) + L"s";
+    int delay = info->delaySec;
+    std::string gid = info->gameId;
+    std::wstring ip = info->misterClientIp;
+    delete info;
+
+    if (delay < 1) delay = 3;
+
+    for (int s = delay; s > 0; --s) {
+        std::wstring st = L"Status: MiSTer core initializing... PC launching in " + std::to_wstring(s) + L"s";
         SetWindowText(hStaticStatus, st.c_str());
         Sleep(1000);
     }
-    LaunchGame(info->gameId, info->misterClientIp);
-    delete info;
+    SetWindowText(hStaticStatus, L"Status: MiSTer core ready. Launching GroovyMAME stream now...");
+    LaunchGame(gid, ip);
     return 0;
 }
 
@@ -818,7 +842,17 @@ DWORD WINAPI DaemonThreadProc(LPVOID lpParam) {
                     gameId.pop_back();
                 }
 
-                int delaySec = 0;
+                // Default 3 seconds PC-side delay before launching emulator!
+                int delaySec = 3;
+                if (hEditLaunchDelay != NULL) {
+                    std::wstring dStr = GetText(hEditLaunchDelay);
+                    if (!dStr.empty()) {
+                        try {
+                            delaySec = std::stoi(dStr);
+                        } catch (...) {}
+                    }
+                }
+
                 size_t dPos = gameId.find(":delay=");
                 if (dPos != std::string::npos) {
                     try {
@@ -827,13 +861,11 @@ DWORD WINAPI DaemonThreadProc(LPVOID lpParam) {
                     gameId = gameId.substr(0, dPos);
                 }
 
-                if (delaySec > 0) {
-                    DelayedLaunchInfo* info = new DelayedLaunchInfo{ gameId, misterClientIp, delaySec };
-                    HANDLE hThread = CreateThread(NULL, 0, DelayedLaunchThread, info, 0, NULL);
-                    if (hThread) CloseHandle(hThread);
-                } else {
-                    LaunchGame(gameId, misterClientIp);
-                }
+                if (delaySec < 1) delaySec = 3; // Ensure at least 3 seconds PC-side delay
+
+                DelayedLaunchInfo* info = new DelayedLaunchInfo{ gameId, misterClientIp, delaySec };
+                HANDLE hThread = CreateThread(NULL, 0, DelayedLaunchThread, info, 0, NULL);
+                if (hThread) CloseHandle(hThread);
 
                 std::string reply = "ACK:LAUNCH:OK:" + gameId;
                 sendto(g_udpSocket, reply.c_str(), (int)reply.length(), 0, (sockaddr*)&clientAddr, clientLen);
@@ -914,10 +946,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
     case WM_CREATE: {
         int y = 12;
-        CreateWindow(L"STATIC", L"MiSTer FPGA IP Address:", WS_CHILD | WS_VISIBLE, 20, y, 170, 20, hWnd, NULL, hInst, NULL);
-        hEditMisterIp = CreateWindow(L"EDIT", L"192.168.1.50", WS_CHILD | WS_VISIBLE | WS_BORDER, 195, y, 160, 22, hWnd, (HMENU)IDC_EDIT_MISTER_IP, hInst, NULL);
-        CreateWindow(L"STATIC", L"UDP Port (Default 1999):", WS_CHILD | WS_VISIBLE, 375, y, 160, 20, hWnd, NULL, hInst, NULL);
-        hEditUdpPort = CreateWindow(L"EDIT", L"1999", WS_CHILD | WS_VISIBLE | WS_BORDER, 545, y, 95, 22, hWnd, (HMENU)IDC_EDIT_UDP_PORT, hInst, NULL);
+        CreateWindow(L"STATIC", L"MiSTer IP:", WS_CHILD | WS_VISIBLE, 20, y, 70, 20, hWnd, NULL, hInst, NULL);
+        hEditMisterIp = CreateWindow(L"EDIT", L"192.168.1.50", WS_CHILD | WS_VISIBLE | WS_BORDER, 95, y, 120, 22, hWnd, (HMENU)IDC_EDIT_MISTER_IP, hInst, NULL);
+
+        CreateWindow(L"STATIC", L"UDP Port:", WS_CHILD | WS_VISIBLE, 225, y, 65, 20, hWnd, NULL, hInst, NULL);
+        hEditUdpPort = CreateWindow(L"EDIT", L"1999", WS_CHILD | WS_VISIBLE | WS_BORDER, 295, y, 55, 22, hWnd, (HMENU)IDC_EDIT_UDP_PORT, hInst, NULL);
+
+        CreateWindow(L"STATIC", L"Launch Delay (s):", WS_CHILD | WS_VISIBLE, 365, y, 110, 20, hWnd, NULL, hInst, NULL);
+        hEditLaunchDelay = CreateWindow(L"EDIT", L"3", WS_CHILD | WS_VISIBLE | WS_BORDER, 480, y, 40, 22, hWnd, (HMENU)IDC_EDIT_LAUNCH_DELAY, hInst, NULL);
 
         // 1. GroovyMAME
         y += 32;
@@ -1010,7 +1046,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 if (bracketEnd != std::wstring::npos) {
                     std::wstring title = s.substr(bracketEnd + 2);
                     std::string gid(title.begin(), title.end());
-                    LaunchGame(gid);
+                    int delaySec = 3;
+                    if (hEditLaunchDelay != NULL) {
+                        std::wstring dStr = GetText(hEditLaunchDelay);
+                        if (!dStr.empty()) {
+                            try { delaySec = std::stoi(dStr); } catch (...) {}
+                        }
+                    }
+                    if (delaySec > 0) {
+                        DelayedLaunchInfo* info = new DelayedLaunchInfo{ gid, L"", delaySec };
+                        HANDLE hThread = CreateThread(NULL, 0, DelayedLaunchThread, info, 0, NULL);
+                        if (hThread) CloseHandle(hThread);
+                    } else {
+                        LaunchGame(gid);
+                    }
                 }
             }
             break;
@@ -1105,6 +1154,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             break;
         case IDC_BTN_LAUNCH_GAME: {
             int sel = (int)SendMessage(hListGames, LB_GETCURSEL, 0, 0);
+            std::string gid = "kinst";
             if (sel != LB_ERR) {
                 wchar_t itemText[256] = { 0 };
                 SendMessage(hListGames, LB_GETTEXT, sel, (LPARAM)itemText);
@@ -1112,11 +1162,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 size_t bracketEnd = s.find(L"] ");
                 if (bracketEnd != std::wstring::npos) {
                     std::wstring title = s.substr(bracketEnd + 2);
-                    std::string gid(title.begin(), title.end());
-                    LaunchGame(gid);
+                    gid = std::string(title.begin(), title.end());
                 }
+            }
+            int delaySec = 3;
+            if (hEditLaunchDelay != NULL) {
+                std::wstring dStr = GetText(hEditLaunchDelay);
+                if (!dStr.empty()) {
+                    try { delaySec = std::stoi(dStr); } catch (...) {}
+                }
+            }
+            if (delaySec > 0) {
+                DelayedLaunchInfo* info = new DelayedLaunchInfo{ gid, L"", delaySec };
+                HANDLE hThread = CreateThread(NULL, 0, DelayedLaunchThread, info, 0, NULL);
+                if (hThread) CloseHandle(hThread);
             } else {
-                LaunchGame("kinst");
+                LaunchGame(gid);
             }
             break;
         }
