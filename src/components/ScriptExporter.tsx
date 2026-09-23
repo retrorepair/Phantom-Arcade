@@ -155,8 +155,8 @@ export const ScriptExporter: React.FC = () => {
             </div>
             <button
               onClick={() => {
-                navigator.clipboard.writeText('curl -k -sSL https://raw.githubusercontent.com/joelwhybrow/phantom-arcade-bridge/main/mister_client/install_mister.sh | bash');
-                alert('Copied direct GitHub installer to clipboard:\ncurl -k -sSL https://raw.githubusercontent.com/joelwhybrow/phantom-arcade-bridge/main/mister_client/install_mister.sh | bash');
+                navigator.clipboard.writeText('curl -k -sSL https://raw.githubusercontent.com/retrorepair/Phantom-Arcade/main/mister_client/install_mister.sh | bash');
+                alert('Copied direct GitHub installer to clipboard:\ncurl -k -sSL https://raw.githubusercontent.com/retrorepair/Phantom-Arcade/main/mister_client/install_mister.sh | bash\n\n(Note: Requires repository to be set to Public on GitHub)');
               }}
               className="w-full py-1.5 px-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-100 font-bold text-xs rounded font-mono flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >

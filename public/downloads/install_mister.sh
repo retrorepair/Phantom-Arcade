@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # =============================================================================
 # Phantom Arcade — 1-Line MiSTer FPGA Auto-Installer
-# Pulls directly from GitHub to eliminate any PC daemon/firewall dependency.
+# Repository: https://github.com/retrorepair/Phantom-Arcade
 #
 # Run on MiSTer (Press F9 for Linux CLI, or via SSH):
-#   curl -k -sSL https://raw.githubusercontent.com/joelwhybrow/phantom-arcade-bridge/main/mister_client/install_mister.sh | bash
+#   curl -k -sSL https://raw.githubusercontent.com/retrorepair/Phantom-Arcade/main/mister_client/install_mister.sh | bash
 # =============================================================================
 
 set -e
 
-REPO_USER="joelwhybrow"
-REPO_NAME="phantom-arcade-bridge"
+REPO_USER="retrorepair"
+REPO_NAME="Phantom-Arcade"
 REPO_BRANCH="main"
 RAW_BASE="https://raw.githubusercontent.com/${REPO_USER}/${REPO_NAME}/${REPO_BRANCH}"
 
@@ -29,7 +29,7 @@ mkdir -p /media/fat/config
 # 1. Download Groovy_MiSTer Core (groovy.rbf)
 if [ ! -f /media/fat/_Groovy/groovy.rbf ]; then
     echo "[2/4] Downloading Groovy_MiSTer core (groovy.rbf)..."
-    curl -k -L --connect-timeout 8 --max-time 60 \
+    curl -k -f -L --connect-timeout 8 --max-time 60 \
       -o /media/fat/_Groovy/groovy.rbf \
       "https://raw.githubusercontent.com/MiSTer-devel/Groovy_MiSTer/main/releases/groovy.rbf" || {
         echo "[-] Note: Could not download groovy.rbf automatically."
@@ -40,15 +40,37 @@ else
 fi
 
 # 2. Download Phantom_Arcade.sh from GitHub
-echo "[3/4] Downloading latest Phantom_Arcade.sh launcher from GitHub..."
-curl -k -L --connect-timeout 8 --max-time 30 \
+echo "[3/4] Downloading latest Phantom_Arcade.sh launcher from GitHub (${RAW_BASE})..."
+DOWNLOAD_OK=false
+
+if curl -k -f -L --connect-timeout 8 --max-time 30 \
   -o /media/fat/Scripts/Phantom_Arcade.sh \
-  "${RAW_BASE}/mister_client/Phantom_Arcade.sh" || {
-    echo "[-] Warning: Failed to download from GitHub main branch. Trying master..."
-    curl -k -L --connect-timeout 8 --max-time 30 \
-      -o /media/fat/Scripts/Phantom_Arcade.sh \
-      "https://raw.githubusercontent.com/${REPO_USER}/${REPO_NAME}/master/mister_client/Phantom_Arcade.sh"
-}
+  "${RAW_BASE}/mister_client/Phantom_Arcade.sh" 2>/dev/null; then
+    DOWNLOAD_OK=true
+elif curl -k -f -L --connect-timeout 8 --max-time 30 \
+  -o /media/fat/Scripts/Phantom_Arcade.sh \
+  "https://raw.githubusercontent.com/${REPO_USER}/${REPO_NAME}/master/mister_client/Phantom_Arcade.sh" 2>/dev/null; then
+    DOWNLOAD_OK=true
+fi
+
+if [ "$DOWNLOAD_OK" = false ]; then
+    echo ""
+    echo "=========================================================="
+    echo " [!] ERROR: Could not download script from GitHub."
+    echo "=========================================================="
+    echo " Possible causes:"
+    echo " 1. The repository https://github.com/${REPO_USER}/${REPO_NAME} is PRIVATE."
+    echo "    GitHub returns '404: Not Found' to unauthenticated curl requests"
+    echo "    for private repositories."
+    echo ""
+    echo "    To fix:"
+    echo "    a) Set repo visibility to PUBLIC on GitHub (Settings -> Danger Zone),"
+    echo "       OR"
+    echo "    b) Copy Phantom_Arcade.sh directly from your PC to MiSTer via SCP:"
+    echo "       scp mister_client/Phantom_Arcade.sh root@<MISTER_IP>:/media/fat/Scripts/"
+    echo "=========================================================="
+    exit 1
+fi
 
 chmod +x /media/fat/Scripts/Phantom_Arcade.sh
 

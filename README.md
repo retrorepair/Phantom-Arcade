@@ -125,22 +125,31 @@ To anyone playing on your arcade cabinet or CRT, **it feels like the MiSTer is r
 
 Choose either of the two simplified installation methods:
 
-#### Method 1: Direct GitHub 1-Line Installer (Recommended — Zero Ambiguity)
-Pulls directly from GitHub's CDN to your MiSTer SD card. Does not require your PC server to be pre-running, and eliminates hangs caused by Windows Firewall blocking port 8088:
+#### Method 1: Direct GitHub 1-Line Installer (Requires Public Repository)
+Pulls directly from GitHub's CDN to your MiSTer SD card. Does not require your PC server to be pre-running, and eliminates hangs caused by Windows Firewall:
 1. On your MiSTer, press **F9** (or SSH into `root@mister.local`).
 2. Run this single command:
    ```bash
-   curl -k -sSL https://raw.githubusercontent.com/joelwhybrow/phantom-arcade-bridge/main/mister_client/install_mister.sh | bash
+   curl -k -sSL https://raw.githubusercontent.com/retrorepair/Phantom-Arcade/main/mister_client/install_mister.sh | bash
    ```
-   *This automatically creates directories, downloads `groovy.rbf`, configures the connection, and installs `/media/fat/Scripts/Phantom_Arcade.sh`.*
+   *Note: If your repository is set to **Private**, GitHub will reject unauthenticated curl calls with `404: Not Found` (resulting in `bash: line 1: 404:: command not found`). Either set the repository visibility to **Public** on GitHub (Settings → Danger Zone → Change to Public), or use Method 2 below.*
 
-#### Method 2: Direct Script Download via curl
-If you only want the launcher script without running an installer:
+#### Method 2: SCP Direct Copy from PC (Works with Private or Public Repos)
+If your repository is **Private** and you don't want to make it public, copy the files directly from your PC across your home network:
 ```bash
-curl -k -L -o /media/fat/Scripts/Phantom_Arcade.sh "https://raw.githubusercontent.com/joelwhybrow/phantom-arcade-bridge/main/mister_client/Phantom_Arcade.sh" && chmod +x /media/fat/Scripts/Phantom_Arcade.sh
+# From Windows PowerShell / Command Prompt / Terminal on your PC:
+scp mister_client/Phantom_Arcade.sh root@<MISTER_IP>:/media/fat/Scripts/
+```
+Or open Windows File Explorer and navigate to your MiSTer Samba network share:
+`\\<MISTER_IP>\media\fat\Scripts\` and drop `Phantom_Arcade.sh` there.
+
+#### Method 3: Direct Script Download via curl (Public Repo)
+If you only want the launcher script without running the installer:
+```bash
+curl -k -L -o /media/fat/Scripts/Phantom_Arcade.sh "https://raw.githubusercontent.com/retrorepair/Phantom-Arcade/main/mister_client/Phantom_Arcade.sh" && chmod +x /media/fat/Scripts/Phantom_Arcade.sh
 ```
 
-#### Method 3: Single-File Drop via SD Card
+#### Method 4: Single-File Drop via SD Card
 1. Copy **`Phantom_Arcade.sh`** into your MiSTer SD card at `/media/fat/Scripts/`.
 2. Boot your MiSTer and select **Scripts → Phantom_Arcade**.
 3. **No manual IP entry required!** The script automatically broadcasts a UDP probe across your local network (testing ports 1999 and 2154), discovers your running PC server, fetches your game library, and launches games.

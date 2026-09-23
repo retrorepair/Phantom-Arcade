@@ -235,18 +235,18 @@ export const WindowsSetupApp: React.FC = () => {
                 </span>
                 <span className="text-xs font-bold text-white">Direct GitHub 1-Line Installer for MiSTer</span>
               </div>
-              <span className="text-[11px] text-neutral-400">No PC web server needed to install</span>
+              <span className="text-[11px] text-neutral-400">repo: retrorepair/Phantom-Arcade</span>
             </div>
             <p className="text-xs text-neutral-300">
-              Run this directly on your MiSTer (via F9 Linux console or SSH). Pulls cleanly from GitHub so it won't hang on PC firewalls:
+              Run this on your MiSTer (via F9 Linux console or SSH). <span className="text-amber-300 font-medium">Requires repo set to Public</span> on GitHub (otherwise GitHub returns 404 to unauthenticated curl requests):
             </p>
             <div className="bg-neutral-950 border border-cyan-900/50 rounded-lg p-2.5 flex items-center justify-between gap-3 font-mono text-xs">
               <span className="text-cyan-300 select-all overflow-x-auto truncate">
-                curl -k -sSL https://raw.githubusercontent.com/joelwhybrow/phantom-arcade-bridge/main/mister_client/install_mister.sh | bash
+                curl -k -sSL https://raw.githubusercontent.com/retrorepair/Phantom-Arcade/main/mister_client/install_mister.sh | bash
               </span>
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText('curl -k -sSL https://raw.githubusercontent.com/joelwhybrow/phantom-arcade-bridge/main/mister_client/install_mister.sh | bash');
+                  navigator.clipboard.writeText('curl -k -sSL https://raw.githubusercontent.com/retrorepair/Phantom-Arcade/main/mister_client/install_mister.sh | bash');
                   setCopiedMisterCmd(true);
                   setTimeout(() => setCopiedMisterCmd(false), 2000);
                 }}
@@ -255,6 +255,9 @@ export const WindowsSetupApp: React.FC = () => {
                 {copiedMisterCmd ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                 <span>{copiedMisterCmd ? 'Copied' : 'Copy'}</span>
               </button>
+            </div>
+            <div className="text-[11px] text-neutral-400 flex flex-wrap gap-x-4 gap-y-1 pt-1 border-t border-neutral-800">
+              <span><strong>If repo is Private:</strong> Copy script directly via SCP from PC: <code className="text-neutral-300 bg-neutral-950 px-1 py-0.5 rounded">scp mister_client/Phantom_Arcade.sh root@&lt;MISTER_IP&gt;:/media/fat/Scripts/</code></span>
             </div>
           </div>
 

@@ -632,17 +632,17 @@ curl -k -s --connect-timeout 2 -m 4 "http://$PC_IP:$HTTP_PORT/catalog.json" -o /
   {
     filename: 'install_mister.sh',
     targetPlatform: 'MiSTer FPGA (Linux ARM)',
-    destinationPath: 'Run via: curl -k -sSL https://raw.githubusercontent.com/joelwhybrow/phantom-arcade-bridge/main/mister_client/install_mister.sh | bash',
-    description: '1-Line automatic installer script for MiSTer. Pulls directly from GitHub CDN with zero PC firewall or server prerequisites.',
+    destinationPath: 'Run via: curl -k -sSL https://raw.githubusercontent.com/retrorepair/Phantom-Arcade/main/mister_client/install_mister.sh | bash',
+    description: '1-Line automatic installer script for MiSTer. Pulls directly from GitHub CDN with zero PC firewall or server prerequisites (requires public repo).',
     language: 'bash',
     code: `#!/usr/bin/env bash
 # Run on MiSTer (Press F9 for Linux CLI, or via SSH):
-#   curl -k -sSL https://raw.githubusercontent.com/joelwhybrow/phantom-arcade-bridge/main/mister_client/install_mister.sh | bash
+#   curl -k -sSL https://raw.githubusercontent.com/retrorepair/Phantom-Arcade/main/mister_client/install_mister.sh | bash
 mkdir -p /media/fat/_Groovy /media/fat/Scripts /media/fat/config
 echo "[*] Downloading Groovy_MiSTer core..."
 curl -k -L --connect-timeout 8 -o /media/fat/_Groovy/groovy.rbf "https://raw.githubusercontent.com/MiSTer-devel/Groovy_MiSTer/main/releases/groovy.rbf"
 echo "[*] Downloading Phantom_Arcade.sh from GitHub..."
-curl -k -L --connect-timeout 8 -o /media/fat/Scripts/Phantom_Arcade.sh "https://raw.githubusercontent.com/joelwhybrow/phantom-arcade-bridge/main/mister_client/Phantom_Arcade.sh"
+curl -k -L --connect-timeout 8 -o /media/fat/Scripts/Phantom_Arcade.sh "https://raw.githubusercontent.com/retrorepair/Phantom-Arcade/main/mister_client/Phantom_Arcade.sh"
 chmod +x /media/fat/Scripts/Phantom_Arcade.sh
 echo "[✓] Phantom Arcade installed! Launch it from MiSTer Main Menu -> Scripts."`
   },
