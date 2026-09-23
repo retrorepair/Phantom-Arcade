@@ -18,7 +18,13 @@ fi
 # 1. If native framebuffer graphical frontend is present, launch it!
 if [ -x "$FRONTEND_BIN" ]; then
     echo "[+] Launching Phantom Arcade Graphical Framebuffer CRT UI..."
-    exec "$FRONTEND_BIN" "$PC_IP"
+    setterm -cursor off > /dev/tty0 2>/dev/null
+    stty -echo < /dev/tty0 2>/dev/null
+    clear > /dev/tty0 2>/dev/null
+    "$FRONTEND_BIN" "$PC_IP"
+    setterm -cursor on > /dev/tty0 2>/dev/null
+    stty echo < /dev/tty0 2>/dev/null
+    exit 0
 fi
 
 # 2. If user has core installed, switch directly to Groovy RBF core
