@@ -599,8 +599,12 @@ void ScanRomDirectories() {
     SetWindowText(hStaticStatus, status.c_str());
 }
 
+std::atomic<bool> g_launchInProgress(false);
+
 // Internal helper that actually spawns GroovyMAME / RetroArch after delay
 bool ExecuteLaunchProcess(const std::string& gameId, const std::wstring& targetMisterIp) {
+    g_launchInProgress.store(false); // Reset guard once launched
+
     if (g_activePid > 0) {
         HANDLE hOld = OpenProcess(PROCESS_TERMINATE, FALSE, g_activePid);
         if (hOld) {
@@ -709,10 +713,10 @@ static DWORD WINAPI DelayedLaunchWorker(LPVOID lpParam) {
     std::wstring ip = params->misterIp;
     delete params;
 
-    if (delay < 1) delay = 5;
+    if (delay < 6) delay = 6; // Enforce minimum 6 seconds
 
     for (int s = delay; s > 0; --s) {
-        std::wstring st = L"Status: MiSTer FPGA reconfiguring Groovy.rbf... PC launching in " + std::to_wstring(s) + L"s";
+        std::wstring st = L"Status: [WAITING] FPGA reconfiguring Groovy.rbf... Launching PC stream in " + std::to_wstring(s) + L"s";
         SetWindowText(hStaticStatus, st.c_str());
         Sleep(1000);
     }
@@ -721,16 +725,22 @@ static DWORD WINAPI DelayedLaunchWorker(LPVOID lpParam) {
     return 0;
 }
 
-// Public LaunchGame function: ALWAYS invokes the delayed worker thread (default 5 seconds)
+// Public LaunchGame function: ALWAYS invokes the delayed worker thread (default 6 seconds) with re-entrancy guard
 bool LaunchGame(const std::string& gameId, const std::wstring& targetMisterIp) {
-    int delaySec = 5;
+    if (g_launchInProgress.load()) {
+        SetWindowText(hStaticStatus, L"Status: Launch already in progress. Please wait...");
+        return false;
+    }
+    g_launchInProgress.store(true);
+
+    int delaySec = 6;
     if (hEditLaunchDelay != NULL) {
         std::wstring dStr = GetText(hEditLaunchDelay);
         if (!dStr.empty()) {
             try { delaySec = std::stoi(dStr); } catch (...) {}
         }
     }
-    if (delaySec < 1) delaySec = 5;
+    if (delaySec < 6) delaySec = 6;
 
     LaunchTaskParams* params = new LaunchTaskParams{ gameId, targetMisterIp, delaySec };
     HANDLE hThread = CreateThread(NULL, 0, DelayedLaunchWorker, params, 0, NULL);
@@ -738,6 +748,7 @@ bool LaunchGame(const std::string& gameId, const std::wstring& targetMisterIp) {
         CloseHandle(hThread);
         return true;
     }
+    g_launchInProgress.store(false);
     return false;
 }
 
