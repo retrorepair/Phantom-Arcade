@@ -627,7 +627,9 @@ if [ -z "$PC_IP" ] && [ -f "$CONFIG_FILE" ]; then
 fi
 
 echo "[*] Connected to PC Server at: $PC_IP"
-curl -k -s --connect-timeout 2 -m 4 "http://$PC_IP:$HTTP_PORT/catalog.json" -o /tmp/phantom_catalog.json`
+# 1. Direct UDP catalog fetch (zero firewall dependency)
+# 2. HTTP fallback
+# 3. Built-in instant arcade menu launcher`
   },
   {
     filename: 'install_mister.sh',

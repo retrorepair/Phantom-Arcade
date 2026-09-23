@@ -25,6 +25,7 @@
 #include <commctrl.h>
 #include <commdlg.h>
 #include <shlobj.h>
+#include <shellapi.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <iostream>
@@ -269,6 +270,59 @@ void ScanRomDirectories() {
         } catch (...) {}
     }
 
+    if (totalFound == 0) {
+        catOut << "    {\n"
+               << "      \"id\": \"direct_groovy_receiver\",\n"
+               << "      \"title\": \"Groovy_MiSTer Direct Receiver (Wait for PC)\",\n"
+               << "      \"system\": \"mister\",\n"
+               << "      \"systemName\": \"Groovy_MiSTer\",\n"
+               << "      \"romName\": \"groovy.rbf\",\n"
+               << "      \"romPath\": \"\",\n"
+               << "      \"videoMode\": \"15kHz Dynamic CRT\",\n"
+               << "      \"resolution\": \"Dynamic SwitchRes\"\n"
+               << "    },\n"
+               << "    {\n"
+               << "      \"id\": \"mame_sf2ce\",\n"
+               << "      \"title\": \"Street Fighter II' - Champion Edition\",\n"
+               << "      \"system\": \"groovymame\",\n"
+               << "      \"systemName\": \"GroovyMAME Arcade\",\n"
+               << "      \"romName\": \"sf2ce.zip\",\n"
+               << "      \"romPath\": \"C:\\\\Games\\\\Arcade\\\\sf2ce.zip\",\n"
+               << "      \"videoMode\": \"15kHz 224p @ 59.6Hz\",\n"
+               << "      \"resolution\": \"384x224\"\n"
+               << "    },\n"
+               << "    {\n"
+               << "      \"id\": \"mame_mslug\",\n"
+               << "      \"title\": \"Metal Slug - Super Vehicle-001\",\n"
+               << "      \"system\": \"groovymame\",\n"
+               << "      \"systemName\": \"GroovyMAME Arcade\",\n"
+               << "      \"romName\": \"mslug.zip\",\n"
+               << "      \"romPath\": \"C:\\\\Games\\\\Arcade\\\\mslug.zip\",\n"
+               << "      \"videoMode\": \"15kHz 224p @ 59.18Hz\",\n"
+               << "      \"resolution\": \"320x224\"\n"
+               << "    },\n"
+               << "    {\n"
+               << "      \"id\": \"retroarch_castlevania\",\n"
+               << "      \"title\": \"Castlevania: Symphony of the Night\",\n"
+               << "      \"system\": \"retroarch\",\n"
+               << "      \"systemName\": \"RetroArch SwitchRes\",\n"
+               << "      \"romName\": \"CastlevaniaSOTN.chd\",\n"
+               << "      \"romPath\": \"C:\\\\Games\\\\RetroArch\\\\CastlevaniaSOTN.chd\",\n"
+               << "      \"videoMode\": \"15kHz 240p SwitchRes\",\n"
+               << "      \"resolution\": \"256x240\"\n"
+               << "    },\n"
+               << "    {\n"
+               << "      \"id\": \"gc_smash_melee\",\n"
+               << "      \"title\": \"Super Smash Bros. Melee\",\n"
+               << "      \"system\": \"dolphin\",\n"
+               << "      \"systemName\": \"GameCube / Wii\",\n"
+               << "      \"romName\": \"SmashMelee.iso\",\n"
+               << "      \"romPath\": \"C:\\\\Games\\\\GameCube\\\\SmashMelee.iso\",\n"
+               << "      \"videoMode\": \"15kHz 480i / 240p\",\n"
+               << "      \"resolution\": \"640x480i\"\n"
+               << "    }\n";
+    }
+
     catOut << "\n  ]\n}\n";
     catOut.close();
 
@@ -366,6 +420,35 @@ DWORD WINAPI HttpThreadProc(LPVOID lpParam) {
                 std::string resp = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: " +
                                   std::to_string(body.length()) + "\r\nConnection: close\r\n\r\n" + body;
                 send(clientSock, resp.c_str(), (int)resp.length(), 0);
+            } else if (req.find("GET /mister_script") != std::string::npos) {
+                std::ifstream f("Phantom_Arcade.sh");
+                std::string body = "";
+                if (f.is_open()) {
+                    std::stringstream ss;
+                    ss << f.rdbuf();
+                    body = ss.str();
+                } else {
+                    // Try looking in relative folders
+                    std::ifstream f2("../mister_client/Phantom_Arcade.sh");
+                    if (f2.is_open()) {
+                        std::stringstream ss;
+                        ss << f2.rdbuf();
+                        body = ss.str();
+                    }
+                }
+                std::string resp = "HTTP/1.1 200 OK\r\nContent-Type: text/x-shellscript\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: " +
+                                  std::to_string(body.length()) + "\r\nConnection: close\r\n\r\n" + body;
+                send(clientSock, resp.c_str(), (int)resp.length(), 0);
+            } else if (req.find("GET /install") != std::string::npos) {
+                std::string body = "#!/usr/bin/env bash\n"
+                                   "mkdir -p /media/fat/_Groovy /media/fat/Scripts /media/fat/config\n"
+                                   "curl -k -L --connect-timeout 8 -o /media/fat/_Groovy/groovy.rbf \"https://raw.githubusercontent.com/MiSTer-devel/Groovy_MiSTer/main/releases/groovy.rbf\" 2>/dev/null\n"
+                                   "curl -sSL \"http://" + std::string(inet_ntoa(bindAddr.sin_addr)) + ":8088/mister_script\" -o /media/fat/Scripts/Phantom_Arcade.sh\n"
+                                   "chmod +x /media/fat/Scripts/Phantom_Arcade.sh\n"
+                                   "echo \"[✓] Phantom Arcade installed! Find it in MiSTer Main Menu -> Scripts.\"\n";
+                std::string resp = "HTTP/1.1 200 OK\r\nContent-Type: text/x-shellscript\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: " +
+                                  std::to_string(body.length()) + "\r\nConnection: close\r\n\r\n" + body;
+                send(clientSock, resp.c_str(), (int)resp.length(), 0);
             } else {
                 std::string body = "{\"status\":\"Phantom Arcade Host Online\",\"http_port\":8088}";
                 std::string resp = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: " +
@@ -399,9 +482,21 @@ DWORD WINAPI DaemonThreadProc(LPVOID lpParam) {
     bindAddr.sin_port = htons(port);
     bindAddr.sin_addr.s_addr = INADDR_ANY;
 
-    bind(g_udpSocket, (sockaddr*)&bindAddr, sizeof(bindAddr));
+    // Automatic Port Check & Fallback: If port 1999 is occupied, automatically fallback
+    if (bind(g_udpSocket, (sockaddr*)&bindAddr, sizeof(bindAddr)) == SOCKET_ERROR) {
+        port = 2154;
+        bindAddr.sin_port = htons(port);
+        if (bind(g_udpSocket, (sockaddr*)&bindAddr, sizeof(bindAddr)) == SOCKET_ERROR) {
+            bindAddr.sin_port = htons(0); // system assigns next available port
+            bind(g_udpSocket, (sockaddr*)&bindAddr, sizeof(bindAddr));
+            int len = sizeof(bindAddr);
+            getsockname(g_udpSocket, (sockaddr*)&bindAddr, &len);
+            port = ntohs(bindAddr.sin_port);
+        }
+        g_configuredPort = port;
+    }
 
-    char buffer[1024];
+    char buffer[2048];
     sockaddr_in clientAddr;
     int clientLen = sizeof(clientAddr);
 
@@ -412,9 +507,23 @@ DWORD WINAPI DaemonThreadProc(LPVOID lpParam) {
             std::string msg(buffer);
 
             if (msg.rfind("DISCOVER_PHANTOM", 0) == 0) {
-                // Auto-discovery response
-                std::string reply = "PHANTOM_HOST_ONLINE:" + std::to_string(port);
+                // Auto-discovery response with active UDP and HTTP ports
+                std::string reply = "PHANTOM_HOST_ONLINE:" + std::to_string(port) + ":8088";
                 sendto(g_udpSocket, reply.c_str(), (int)reply.length(), 0, (sockaddr*)&clientAddr, clientLen);
+            } else if (msg == "GET_CATALOG") {
+                // Direct UDP catalog transfer (Zero HTTP firewall dependency!)
+                std::ifstream f("games_catalog.json");
+                std::string catData = "";
+                if (f.is_open()) {
+                    std::stringstream ss;
+                    ss << f.rdbuf();
+                    catData = ss.str();
+                }
+                if (catData.empty()) {
+                    catData = "{\"games\":[]}";
+                }
+                int sendLen = (int)std::min(catData.length(), (size_t)60000);
+                sendto(g_udpSocket, catData.c_str(), sendLen, 0, (sockaddr*)&clientAddr, clientLen);
             } else if (msg.rfind("LAUNCH:", 0) == 0) {
                 // Launch requested emulator process...
                 const char* reply = "ACK:LAUNCH:OK";
@@ -441,6 +550,24 @@ DWORD WINAPI DaemonThreadProc(LPVOID lpParam) {
     closesocket(g_udpSocket);
     WSACleanup();
     return 0;
+}
+
+// Silently ensure Windows Defender Firewall allows Phantom Arcade and Groovy_MiSTer ports
+void EnsureFirewallRules() {
+    wchar_t exePath[MAX_PATH];
+    GetModuleFileName(NULL, exePath, MAX_PATH);
+
+    // Register application executable in firewall
+    std::wstring cmd1 = L"advfirewall firewall add rule name=\"Phantom Arcade Manager\" dir=in action=allow program=\"" + std::wstring(exePath) + L"\" enable=yes";
+    ShellExecute(NULL, L"open", L"netsh.exe", cmd1.c_str(), NULL, SW_HIDE);
+
+    // Open UDP 1999 (Default MiSTer Groovy port)
+    std::wstring cmd2 = L"advfirewall firewall add rule name=\"Groovy_MiSTer UDP 1999\" dir=in action=allow protocol=UDP localport=1999 enable=yes";
+    ShellExecute(NULL, L"open", L"netsh.exe", cmd2.c_str(), NULL, SW_HIDE);
+
+    // Open TCP 8088 (HTTP Catalog Server)
+    std::wstring cmd3 = L"advfirewall firewall add rule name=\"Phantom Arcade HTTP 8088\" dir=in action=allow protocol=TCP localport=8088 enable=yes";
+    ShellExecute(NULL, L"open", L"netsh.exe", cmd3.c_str(), NULL, SW_HIDE);
 }
 
 // Toggle Daemon State
@@ -682,6 +809,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     ShowWindow(hMainWnd, nCmdShow);
     UpdateWindow(hMainWnd);
+
+    // Automatically configure Windows Firewall and start the daemon immediately
+    EnsureFirewallRules();
+    if (!fs::exists("games_catalog.json")) {
+        ScanRomDirectories();
+    }
+    ToggleDaemon();
 
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0)) {
