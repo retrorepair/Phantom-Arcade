@@ -599,8 +599,8 @@ void ScanRomDirectories() {
     SetWindowText(hStaticStatus, status.c_str());
 }
 
-// Live Emulator Process Launcher (Launches GroovyMAME with -video mister -mister_ip ... streaming to FPGA)
-bool LaunchGame(const std::string& gameId, const std::wstring& targetMisterIp) {
+// Internal helper that actually spawns GroovyMAME / RetroArch after delay
+bool ExecuteLaunchProcess(const std::string& gameId, const std::wstring& targetMisterIp) {
     if (g_activePid > 0) {
         HANDLE hOld = OpenProcess(PROCESS_TERMINATE, FALSE, g_activePid);
         if (hOld) {
@@ -694,6 +694,51 @@ bool LaunchGame(const std::string& gameId, const std::wstring& targetMisterIp) {
         SetWindowText(hStaticStatus, stat.c_str());
         return false;
     }
+}
+
+struct LaunchTaskParams {
+    std::string gameId;
+    std::wstring misterIp;
+    int delaySec;
+};
+
+static DWORD WINAPI DelayedLaunchWorker(LPVOID lpParam) {
+    LaunchTaskParams* params = (LaunchTaskParams*)lpParam;
+    int delay = params->delaySec;
+    std::string gid = params->gameId;
+    std::wstring ip = params->misterIp;
+    delete params;
+
+    if (delay < 1) delay = 5;
+
+    for (int s = delay; s > 0; --s) {
+        std::wstring st = L"Status: MiSTer FPGA reconfiguring Groovy.rbf... PC launching in " + std::to_wstring(s) + L"s";
+        SetWindowText(hStaticStatus, st.c_str());
+        Sleep(1000);
+    }
+    SetWindowText(hStaticStatus, L"Status: FPGA core ready. Launching GroovyMAME stream now...");
+    ExecuteLaunchProcess(gid, ip);
+    return 0;
+}
+
+// Public LaunchGame function: ALWAYS invokes the delayed worker thread (default 5 seconds)
+bool LaunchGame(const std::string& gameId, const std::wstring& targetMisterIp) {
+    int delaySec = 5;
+    if (hEditLaunchDelay != NULL) {
+        std::wstring dStr = GetText(hEditLaunchDelay);
+        if (!dStr.empty()) {
+            try { delaySec = std::stoi(dStr); } catch (...) {}
+        }
+    }
+    if (delaySec < 1) delaySec = 5;
+
+    LaunchTaskParams* params = new LaunchTaskParams{ gameId, targetMisterIp, delaySec };
+    HANDLE hThread = CreateThread(NULL, 0, DelayedLaunchWorker, params, 0, NULL);
+    if (hThread) {
+        CloseHandle(hThread);
+        return true;
+    }
+    return false;
 }
 
 // Background HTTP Worker Thread Function (Serves /catalog.json on TCP :8088)
