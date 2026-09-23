@@ -11,10 +11,17 @@ add_executable(PhantomArcadeManager WIN32
 target_link_libraries(PhantomArcadeManager PRIVATE
     ws2_32
     comctl32
+    comdlg32
     shell32
+    ole32
     user32
     gdi32
+    advapi32
 )
+
+if (MINGW OR CMAKE_COMPILER_IS_GNUCXX)
+    target_link_options(PhantomArcadeManager PRIVATE -static -static-libgcc -static-libstdc++)
+endif()
 
 # Enable Unicode
 target_compile_definitions(PhantomArcadeManager PRIVATE
