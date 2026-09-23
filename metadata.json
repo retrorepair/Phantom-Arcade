@@ -1,0 +1,7 @@
+{
+  "name": "Phantom Arcade - Groovy_MiSTer Bridge",
+  "description": "Client-server bridge and launcher suite connecting MiSTer FPGA to headless PC emulators (PS2, GameCube, Wii, Arcade) with CRT Groovy_MiSTer video streaming.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
