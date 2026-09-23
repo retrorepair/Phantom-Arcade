@@ -605,6 +605,11 @@ std::atomic<bool> g_launchInProgress(false);
 bool ExecuteLaunchProcess(const std::string& gameId, const std::wstring& targetMisterIp) {
     g_launchInProgress.store(false); // Reset guard once launched
 
+    // Aggressively kill any existing MAME/RetroArch instances to ensure single process state
+    system("taskkill /f /im mame.exe 2>nul");
+    system("taskkill /f /im groovymame.exe 2>nul");
+    system("taskkill /f /im retroarch.exe 2>nul");
+
     if (g_activePid > 0) {
         HANDLE hOld = OpenProcess(PROCESS_TERMINATE, FALSE, g_activePid);
         if (hOld) {

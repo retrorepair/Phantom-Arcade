@@ -726,9 +726,6 @@ static void send_udp_launch(const char *game_id) {
     char packet[128];
     snprintf(packet, sizeof(packet), "LAUNCH:%s", game_id);
     sendto(sockfd, packet, strlen(packet), 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
-    // Redundant retry datagram after 100ms in case of switch buffer latency
-    usleep(100000);
-    sendto(sockfd, packet, strlen(packet), 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
     close(sockfd);
     printf("[+] Sent '%s' to %s:%d\n", packet, pc_ip, udp_port);
 }
