@@ -737,6 +737,24 @@ DWORD WINAPI HttpThreadProc(LPVOID lpParam) {
 }
 
 // Background UDP Listener Thread Function
+struct DelayedLaunchInfo {
+    std::string gameId;
+    std::wstring misterClientIp;
+    int delaySec;
+};
+
+static DWORD WINAPI DelayedLaunchThread(LPVOID lpParam) {
+    DelayedLaunchInfo* info = (DelayedLaunchInfo*)lpParam;
+    for (int s = info->delaySec; s > 0; --s) {
+        std::wstring st = L"Status: MiSTer core initializing... Launching in " + std::to_wstring(s) + L"s";
+        SetWindowText(hStaticStatus, st.c_str());
+        Sleep(1000);
+    }
+    LaunchGame(info->gameId, info->misterClientIp);
+    delete info;
+    return 0;
+}
+
 DWORD WINAPI DaemonThreadProc(LPVOID lpParam) {
     int port = g_configuredPort.load();
 
@@ -794,14 +812,30 @@ DWORD WINAPI DaemonThreadProc(LPVOID lpParam) {
                 int sendLen = (int)std::min(catData.length(), (size_t)60000);
                 sendto(g_udpSocket, catData.c_str(), sendLen, 0, (sockaddr*)&clientAddr, clientLen);
             } else if (msg.rfind("LAUNCH:", 0) == 0) {
-                // MIster requested emulator game launch!
+                // MiSTer requested emulator game launch!
                 std::string gameId = msg.substr(7);
                 while (!gameId.empty() && (gameId.back() == '\r' || gameId.back() == '\n' || gameId.back() == ' ')) {
                     gameId.pop_back();
                 }
 
-                bool ok = LaunchGame(gameId, misterClientIp);
-                std::string reply = ok ? ("ACK:LAUNCH:OK:" + gameId) : ("ERR:LAUNCH:FAILED:" + gameId);
+                int delaySec = 0;
+                size_t dPos = gameId.find(":delay=");
+                if (dPos != std::string::npos) {
+                    try {
+                        delaySec = std::stoi(gameId.substr(dPos + 7));
+                    } catch (...) {}
+                    gameId = gameId.substr(0, dPos);
+                }
+
+                if (delaySec > 0) {
+                    DelayedLaunchInfo* info = new DelayedLaunchInfo{ gameId, misterClientIp, delaySec };
+                    HANDLE hThread = CreateThread(NULL, 0, DelayedLaunchThread, info, 0, NULL);
+                    if (hThread) CloseHandle(hThread);
+                } else {
+                    LaunchGame(gameId, misterClientIp);
+                }
+
+                std::string reply = "ACK:LAUNCH:OK:" + gameId;
                 sendto(g_udpSocket, reply.c_str(), (int)reply.length(), 0, (sockaddr*)&clientAddr, clientLen);
             } else if (msg == "KILL") {
                 if (g_activePid > 0) {

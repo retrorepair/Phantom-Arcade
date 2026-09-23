@@ -75,6 +75,7 @@ static struct fb_fix_screeninfo finfo;
 static long screensize = 0;
 static char pc_ip[64] = DEFAULT_PC_IP;
 static int udp_port = DEFAULT_UDP_PORT;
+static int core_launch_delay = 4; // Seconds to let Cyclone V FPGA reconfigure before triggering emulator
 
 static int inputFds[16];
 static int inputCount = 0;
@@ -285,6 +286,10 @@ static void load_config() {
         } else if (strncmp(line, "UDP_PORT=", 9) == 0) {
             udp_port = atoi(line + 9);
             if (udp_port <= 0) udp_port = DEFAULT_UDP_PORT;
+        } else if (strncmp(line, "CORE_LAUNCH_DELAY=", 18) == 0) {
+            core_launch_delay = atoi(line + 18);
+            if (core_launch_delay < 1) core_launch_delay = 1;
+            if (core_launch_delay > 20) core_launch_delay = 20;
         }
     }
     fclose(f);
@@ -721,6 +726,9 @@ static void send_udp_launch(const char *game_id) {
     char packet[128];
     snprintf(packet, sizeof(packet), "LAUNCH:%s", game_id);
     sendto(sockfd, packet, strlen(packet), 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
+    // Redundant retry datagram after 100ms in case of switch buffer latency
+    usleep(100000);
+    sendto(sockfd, packet, strlen(packet), 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
     close(sockfd);
     printf("[+] Sent '%s' to %s:%d\n", packet, pc_ip, udp_port);
 }
@@ -850,18 +858,37 @@ int main(int argc, char *argv[]) {
                             int activeGame = visibleIndices[selected];
                             const char *coreToLoad = (access(GROOVY_CORE_ARCADE, F_OK) == 0) ? GROOVY_CORE_ARCADE : GROOVY_CORE_UTILITY;
 
-                            // 1. FIRST switch FPGA to Groovy.rbf so hardware core and network socket are ALIVE
-                            show_launch_splash(games[activeGame].title, "1/2: Loading Groovy.rbf FPGA receiver...");
+                            char statusMsg[128];
+                            snprintf(statusMsg, sizeof(statusMsg), "Switching FPGA to Groovy.rbf... Stream starts in %ds", core_launch_delay);
+                            show_launch_splash(games[activeGame].title, statusMsg);
+
+                            char targetGameId[64];
+                            strncpy(targetGameId, games[activeGame].id, sizeof(targetGameId) - 1);
+                            targetGameId[sizeof(targetGameId) - 1] = 0;
+
+                            // FORK DETACHED DAEMON:
+                            // Because MiSTer blocks while Phantom_Arcade.sh is running,
+                            // Phantom_Arcade.sh MUST exit immediately so MiSTer unblocks and
+                            // reprograms the Cyclone V FPGA with Groovy.rbf!
+                            // This background child daemon sleeps during the FPGA flashing period (default 4s),
+                            // then triggers the PC emulator right as the receiver core is ready.
+                            pid_t pid = fork();
+                            if (pid == 0) {
+                                setsid();
+                                for (int fd = 0; fd < 64; fd++) {
+                                    close(fd);
+                                }
+                                if (core_launch_delay > 0) {
+                                    sleep(core_launch_delay);
+                                }
+                                send_udp_launch(targetGameId);
+                                _exit(0);
+                            }
+
+                            // In parent: write load_core command to MiSTer FIFO
                             switch_fpga_core(coreToLoad);
 
-                            // 2. Wait 2.2 seconds for the Cyclone V FPGA to reconfigure and start listening!
-                            show_launch_splash(games[activeGame].title, "2/2: FPGA Core Ready. Connecting to PC...");
-                            usleep(2200000); // 2.2s
-
-                            // 3. NOW send UDP launch packet to PC host!
-                            send_udp_launch(games[activeGame].id);
-                            usleep(400000); // 400ms pause
-
+                            // Exit immediately so MiSTer unblocks and starts FPGA programming
                             running = 0;
                             break;
                         }
