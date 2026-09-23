@@ -678,6 +678,25 @@ bool ExecuteLaunchProcess(const std::string& gameId, const std::wstring& targetM
         &pi
     );
 
+    if (!ok) {
+        // Fallback: try launching with just "mame" using system PATH
+        std::wstring fallbackCmd = L"mame " + wStem + L" -video mister -skip_gameinfo -nokeepaspect";
+        std::vector<wchar_t> fbBuf(fallbackCmd.begin(), fallbackCmd.end());
+        fbBuf.push_back(0);
+        ok = CreateProcessW(
+            NULL,
+            fbBuf.data(),
+            NULL,
+            NULL,
+            FALSE,
+            CREATE_NEW_CONSOLE | NORMAL_PRIORITY_CLASS,
+            NULL,
+            NULL,
+            &si,
+            &pi
+        );
+    }
+
     if (ok) {
         g_activePid = pi.dwProcessId;
         CloseHandle(pi.hThread);
