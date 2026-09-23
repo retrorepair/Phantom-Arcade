@@ -144,24 +144,24 @@ export const ScriptExporter: React.FC = () => {
           <div className="bg-neutral-950 p-3.5 rounded-lg border border-neutral-800 flex flex-col justify-between gap-3 hover:border-amber-400/40 transition-colors">
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-white">1-Line Auto-Installer</span>
-                <span className="text-[9px] font-mono bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded">
-                  Instant
+                <span className="text-xs font-bold text-white">GitHub 1-Line Installer</span>
+                <span className="text-[9px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-1.5 py-0.5 rounded">
+                  Zero-Config
                 </span>
               </div>
               <p className="text-[11px] text-neutral-400 mt-1">
-                Run on MiSTer (F9 or SSH): Auto-downloads core, script & registers main menu!
+                Run on MiSTer (F9 or SSH): Pulls directly from GitHub CDN. No PC server or firewall setup needed to install!
               </p>
             </div>
             <button
               onClick={() => {
-                navigator.clipboard.writeText('curl -sSL http://<PC_IP>:8088/install | bash');
-                alert('Copied 1-line installer command to clipboard: curl -sSL http://<PC_IP>:8088/install | bash');
+                navigator.clipboard.writeText('curl -k -sSL https://raw.githubusercontent.com/joelwhybrow/phantom-arcade-bridge/main/mister_client/install_mister.sh | bash');
+                alert('Copied direct GitHub installer to clipboard:\ncurl -k -sSL https://raw.githubusercontent.com/joelwhybrow/phantom-arcade-bridge/main/mister_client/install_mister.sh | bash');
               }}
               className="w-full py-1.5 px-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-100 font-bold text-xs rounded font-mono flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
               <Copy className="w-3.5 h-3.5" />
-              <span>Copy 1-Line Curl</span>
+              <span>Copy GitHub Curl</span>
             </button>
           </div>
         </div>

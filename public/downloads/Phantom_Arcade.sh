@@ -115,10 +115,19 @@ fi
 
 echo -e "${C_WHITE}[*] Fetching games catalog from http://${PC_IP}:${HTTP_PORT}/catalog.json ...${C_RESET}"
 CATALOG_FILE="/tmp/phantom_catalog.json"
-curl -s -m 3 "http://${PC_IP}:${HTTP_PORT}/catalog.json" -o "$CATALOG_FILE" 2>/dev/null
+CACHED_CATALOG="/media/fat/config/games_catalog.json"
 
-if [ ! -s "$CATALOG_FILE" ]; then
-    echo -e "${C_RED}[!] Could not load catalog from PC. Verify PhantomArcadeManager.exe is running on PC.${C_RESET}"
+curl -k -s --connect-timeout 2 -m 4 "http://${PC_IP}:${HTTP_PORT}/catalog.json" -o "$CATALOG_FILE" 2>/dev/null
+
+if [ -s "$CATALOG_FILE" ]; then
+    # Cache catalog for offline/firewall fallback
+    cp "$CATALOG_FILE" "$CACHED_CATALOG" 2>/dev/null || true
+elif [ -s "$CACHED_CATALOG" ]; then
+    echo -e "${C_AMBER}[!] Could not connect to PC HTTP :8088. Using cached catalog.${C_RESET}"
+    cp "$CACHED_CATALOG" "$CATALOG_FILE"
+else
+    echo -e "${C_RED}[!] Could not load catalog from PC (http://${PC_IP}:${HTTP_PORT}/catalog.json).${C_RESET}"
+    echo -e "${C_DIM}    Tip: Make sure PhantomArcadeManager.exe is running on PC and port 8088 is permitted.${C_RESET}"
     read -p "Press Enter to exit..."
     exit 1
 fi

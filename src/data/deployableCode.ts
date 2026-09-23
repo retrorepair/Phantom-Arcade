@@ -62,9 +62,13 @@ def load_config():
                 "exe": "C:\\\\Emulators\\\\GroovyMAME\\\\groovymame64.exe",
                 "args": "-video mister -mister_ip {mister_ip} -mister_port {udp_port} \\\"{rom_stem}\\\""
             },
+            "retroarch": {
+                "exe": "C:\\\\Emulators\\\\RetroArch\\\\retroarch.exe",
+                "args": "-f \\\"{rom}\\\""
+            },
             "ps2": {
                 "exe": "C:\\\\Emulators\\\\PCSX2\\\\pcsx2-qt.exe",
-                "args": "-batch -fullscreen -elf \\"{rom}\\""
+                "args": "-batch -fullscreen -elf \\\"{rom}\\\""
             },
             "gamecube": {
                 "exe": "C:\\\\Emulators\\\\Dolphin\\\\Dolphin.exe",
@@ -591,29 +595,31 @@ target_link_libraries(PhantomArcadeManager PRIVATE ws2_32 comctl32 shell32 user3
 # =============================================================================
 CONFIG_FILE="/media/fat/config/phantom.ini"
 GROOVY_CORE="/media/fat/_Groovy/groovy.rbf"
-UDP_PORT=2154
+UDP_PORT=1999
 HTTP_PORT=8088
 
 # 1. Auto-download Groovy_MiSTer core if missing
 if [ ! -f "$GROOVY_CORE" ]; then
     echo "[!] Downloading Groovy_MiSTer core..."
     mkdir -p "/media/fat/_Groovy"
-    curl -k -L -o "$GROOVY_CORE" "https://raw.githubusercontent.com/MiSTer-devel/Groovy_MiSTer/main/releases/groovy.rbf"
+    curl -k -L --connect-timeout 8 -o "$GROOVY_CORE" "https://raw.githubusercontent.com/MiSTer-devel/Groovy_MiSTer/main/releases/groovy.rbf"
 fi
 
-# 2. LAN UDP Auto-Discovery (Zero manual IP entry!)
+# 2. LAN UDP Auto-Discovery (Default Port 1999)
 PC_IP=$(python3 -c "
 import socket
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 s.settimeout(2.0)
-try:
-    s.sendto(b'DISCOVER_PHANTOM', ('255.255.255.255', 2154))
-    data, addr = s.recvfrom(1024)
-    if 'PHANTOM_HOST' in data.decode('utf-8', errors='ignore'):
-        print(addr[0])
-except:
-    pass
+for port in [1999, 2154]:
+    try:
+        s.sendto(b'DISCOVER_PHANTOM', ('255.255.255.255', port))
+        data, addr = s.recvfrom(1024)
+        if 'PHANTOM_HOST' in data.decode('utf-8', errors='ignore'):
+            print(addr[0])
+            break
+    except:
+        pass
 " 2>/dev/null)
 
 if [ -z "$PC_IP" ] && [ -f "$CONFIG_FILE" ]; then
@@ -621,23 +627,24 @@ if [ -z "$PC_IP" ] && [ -f "$CONFIG_FILE" ]; then
 fi
 
 echo "[*] Connected to PC Server at: $PC_IP"
-curl -s "http://$PC_IP:$HTTP_PORT/catalog.json" -o /tmp/phantom_catalog.json
-# Launches games via UDP LAUNCH:<id> and loads groovy.rbf`
+curl -k -s --connect-timeout 2 -m 4 "http://$PC_IP:$HTTP_PORT/catalog.json" -o /tmp/phantom_catalog.json`
   },
   {
     filename: 'install_mister.sh',
     targetPlatform: 'MiSTer FPGA (Linux ARM)',
-    destinationPath: 'Run via: curl -sSL http://<PC_IP>:8088/install | bash',
-    description: '1-Line automatic installer script for MiSTer. Sets up directories, cores, scripts, and config in seconds.',
+    destinationPath: 'Run via: curl -k -sSL https://raw.githubusercontent.com/joelwhybrow/phantom-arcade-bridge/main/mister_client/install_mister.sh | bash',
+    description: '1-Line automatic installer script for MiSTer. Pulls directly from GitHub CDN with zero PC firewall or server prerequisites.',
     language: 'bash',
     code: `#!/usr/bin/env bash
-# Run on MiSTer (Press F9 or SSH):
-#   curl -sSL http://<YOUR_PC_IP>:8088/install | bash
+# Run on MiSTer (Press F9 for Linux CLI, or via SSH):
+#   curl -k -sSL https://raw.githubusercontent.com/joelwhybrow/phantom-arcade-bridge/main/mister_client/install_mister.sh | bash
 mkdir -p /media/fat/_Groovy /media/fat/Scripts /media/fat/config
-curl -k -L -o /media/fat/_Groovy/groovy.rbf "https://raw.githubusercontent.com/MiSTer-devel/Groovy_MiSTer/main/releases/groovy.rbf"
-curl -sSL "http://\${1:-192.168.1.100}:8088/mister_script" -o /media/fat/Scripts/Phantom_Arcade.sh
+echo "[*] Downloading Groovy_MiSTer core..."
+curl -k -L --connect-timeout 8 -o /media/fat/_Groovy/groovy.rbf "https://raw.githubusercontent.com/MiSTer-devel/Groovy_MiSTer/main/releases/groovy.rbf"
+echo "[*] Downloading Phantom_Arcade.sh from GitHub..."
+curl -k -L --connect-timeout 8 -o /media/fat/Scripts/Phantom_Arcade.sh "https://raw.githubusercontent.com/joelwhybrow/phantom-arcade-bridge/main/mister_client/Phantom_Arcade.sh"
 chmod +x /media/fat/Scripts/Phantom_Arcade.sh
-echo "[✓] Phantom Arcade installed! Find it in MiSTer Main Menu -> Scripts."`
+echo "[✓] Phantom Arcade installed! Launch it from MiSTer Main Menu -> Scripts."`
   },
   {
     filename: 'README.md',

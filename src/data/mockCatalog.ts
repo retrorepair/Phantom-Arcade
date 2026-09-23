@@ -13,6 +13,17 @@ export const DEFAULT_EMULATORS: EmulatorProfile[] = [
     notes: 'Direct native Groovy_MiSTer network streaming. Dynamically switches pixel-accurate arcade modelines on your CRT (CPS1/2/3, NeoGeo, Cave, Midway).'
   },
   {
+    id: 'retroarch',
+    name: 'RetroArch (CRT SwitchRes / Groovy_MiSTer)',
+    system: 'retroarch',
+    executableName: 'retroarch.exe',
+    defaultExecutablePath: 'C:\\Emulators\\RetroArch\\retroarch.exe',
+    commandTemplate: '{exe} -f "{rom}"',
+    videoPipeline: 'RetroArch CRT SwitchRes 15kHz',
+    killMethod: 'taskkill',
+    notes: 'Integrated CRT SwitchRes dynamically switching 240p super resolutions (2560x240 / native) for PS1 (SwanStation/Beetle), SNES, Genesis, Saturn, and FBNeo.'
+  },
+  {
     id: 'dolphin',
     name: 'Dolphin Triforce/Wii CRT',
     system: 'gamecube',
@@ -70,6 +81,22 @@ export const DEFAULT_EMULATORS: EmulatorProfile[] = [
 ];
 
 export const INITIAL_GAMES: GameItem[] = [
+  {
+    id: 'ra_sotn',
+    title: 'Castlevania: Symphony of the Night',
+    system: 'retroarch',
+    systemName: 'RetroArch (PS1 / SwanStation)',
+    romName: 'CastlevaniaSOTN.chd',
+    romPath: 'C:\\Games\\RetroArch\\roms\\CastlevaniaSOTN.chd',
+    emulatorId: 'retroarch',
+    videoMode: '15kHz 240p @ 59.82Hz',
+    resolution: '2560x240 SuperRes',
+    modeline: '"2560x240_59.82" 50.35 2560 2656 2880 3200 240 244 247 263 -hsync -vsync',
+    description: 'Masterpiece action-adventure RPG running via RetroArch CRT SwitchRes directly output to 15kHz CRT display.',
+    year: 1997,
+    genre: 'Action RPG / Metroidvania',
+    bannerColor: 'from-purple-950/80 to-violet-900/40'
+  },
   {
     id: 'mame_sf2ce',
     title: "Street Fighter II' - Champion Edition",

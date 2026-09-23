@@ -24,6 +24,8 @@ export const WindowsSetupApp: React.FC = () => {
   // Emulators
   const [mameExe, setMameExe] = useState('C:\\Emulators\\GroovyMAME\\groovymame64.exe');
   const [mameRoms, setMameRoms] = useState('C:\\Emulators\\GroovyMAME\\roms');
+  const [retroarchExe, setRetroarchExe] = useState('C:\\Emulators\\RetroArch\\retroarch.exe');
+  const [retroarchRoms, setRetroarchRoms] = useState('C:\\Games\\RetroArch\\roms');
   const [dolphinExe, setDolphinExe] = useState('C:\\Emulators\\Dolphin\\Dolphin.exe');
   const [gcRoms, setGcRoms] = useState('C:\\Games\\GameCube');
   const [flycastExe, setFlycastExe] = useState('C:\\Emulators\\Flycast\\flycast.exe');
@@ -33,10 +35,12 @@ export const WindowsSetupApp: React.FC = () => {
 
   const [statusText, setStatusText] = useState('Ready. Default MiSTer Groovy port is 1999. Change port anytime.');
   const [isDaemonRunning, setIsDaemonRunning] = useState(false);
+  const [copiedMisterCmd, setCopiedMisterCmd] = useState(false);
   const [scannedGames, setScannedGames] = useState<string[]>([
     '[GroovyMAME] Street Fighter II\' - Champion Edition (sf2ce.zip)',
     '[GroovyMAME] Metal Slug (mslug.zip)',
-    '[GroovyMAME] The King of Fighters \'98 (kof98.zip)',
+    '[RetroArch] Castlevania: Symphony of the Night (CastlevaniaSOTN.chd)',
+    '[RetroArch] Chrono Trigger (ChronoTrigger.sfc)',
     '[GameCube] Super Smash Bros. Melee (SmashMelee.iso)',
     '[Wii] Tatsunoko vs. Capcom (TatsunokoVsCapcom.iso)',
     '[Naomi] Virtua Fighter 4 Final Tuned (vf4ft.zip)'
@@ -45,21 +49,22 @@ export const WindowsSetupApp: React.FC = () => {
   const [copiedCode, setCopiedCode] = useState(false);
 
   const handleScanRoms = () => {
-    setStatusText('Scanning ROM directories: GroovyMAME, GameCube, Naomi...');
+    setStatusText('Scanning ROM directories: GroovyMAME, RetroArch, GameCube, Naomi...');
     setTimeout(() => {
       setScannedGames([
         '[GroovyMAME] Street Fighter II\' - Champion Edition (sf2ce.zip)',
         '[GroovyMAME] Metal Slug - Super Vehicle-001 (mslug.zip)',
         '[GroovyMAME] The King of Fighters \'98 (kof98.zip)',
-        '[GroovyMAME] Mortal Kombat II (mk2.zip)',
-        '[GroovyMAME] Pac-Man (pacman.zip)',
+        '[RetroArch] Castlevania: Symphony of the Night (CastlevaniaSOTN.chd)',
+        '[RetroArch] Chrono Trigger (ChronoTrigger.sfc)',
+        '[RetroArch] Super Metroid (SuperMetroid.sfc)',
+        '[RetroArch] Sonic The Hedgehog 2 (Sonic2.md)',
         '[GameCube] Super Smash Bros. Melee (SmashMelee.iso)',
         '[GameCube] F-Zero GX (FZeroGX.iso)',
         '[Wii] Tatsunoko vs. Capcom (TatsunokoVsCapcom.iso)',
-        '[Naomi] Virtua Fighter 4 Final Tuned (vf4ft.zip)',
-        '[Naomi] Marvel vs. Capcom 2 (mvsc2.zip)'
+        '[Naomi] Virtua Fighter 4 Final Tuned (vf4ft.zip)'
       ]);
-      setStatusText('Scan complete: 10 ROM files matched and added to catalog.');
+      setStatusText('Scan complete: 11 ROM files matched and added to catalog.');
     }, 400);
   };
 
@@ -87,6 +92,12 @@ export const WindowsSetupApp: React.FC = () => {
           args: `-video mister -mister_ip ${misterIp} -mister_port ${activePort} "{rom_stem}"`,
           pipeline: 'Groovy_MiSTer SwitchRes 15kHz Direct',
           roms_dir: mameRoms
+        },
+        retroarch: {
+          exe: retroarchExe,
+          args: '-f "{rom}"',
+          pipeline: 'RetroArch CRT SwitchRes 15kHz',
+          roms_dir: retroarchRoms
         },
         dolphin: {
           exe: dolphinExe,
@@ -215,6 +226,38 @@ export const WindowsSetupApp: React.FC = () => {
             </div>
           </div>
 
+          {/* Direct GitHub 1-Line Installer Banner */}
+          <div className="bg-gradient-to-r from-cyan-950/40 via-neutral-900 to-neutral-900 border border-cyan-500/30 rounded-xl p-4 max-w-4xl mx-auto shadow-lg space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold font-mono px-2 py-0.5 bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded">
+                  ZERO PC DEPENDENCY
+                </span>
+                <span className="text-xs font-bold text-white">Direct GitHub 1-Line Installer for MiSTer</span>
+              </div>
+              <span className="text-[11px] text-neutral-400">No PC web server needed to install</span>
+            </div>
+            <p className="text-xs text-neutral-300">
+              Run this directly on your MiSTer (via F9 Linux console or SSH). Pulls cleanly from GitHub so it won't hang on PC firewalls:
+            </p>
+            <div className="bg-neutral-950 border border-cyan-900/50 rounded-lg p-2.5 flex items-center justify-between gap-3 font-mono text-xs">
+              <span className="text-cyan-300 select-all overflow-x-auto truncate">
+                curl -k -sSL https://raw.githubusercontent.com/joelwhybrow/phantom-arcade-bridge/main/mister_client/install_mister.sh | bash
+              </span>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText('curl -k -sSL https://raw.githubusercontent.com/joelwhybrow/phantom-arcade-bridge/main/mister_client/install_mister.sh | bash');
+                  setCopiedMisterCmd(true);
+                  setTimeout(() => setCopiedMisterCmd(false), 2000);
+                }}
+                className="px-2.5 py-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded text-[11px] flex items-center gap-1 shrink-0 cursor-pointer"
+              >
+                {copiedMisterCmd ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>{copiedMisterCmd ? 'Copied' : 'Copy'}</span>
+              </button>
+            </div>
+          </div>
+
           {/* Simulated Windows Native Window */}
           <div className="bg-neutral-900 border border-neutral-700/80 rounded-xl overflow-hidden shadow-2xl max-w-4xl mx-auto">
             
@@ -323,9 +366,60 @@ export const WindowsSetupApp: React.FC = () => {
                 </div>
               </div>
 
-              {/* Row 3: Dolphin Configuration */}
+              {/* Row 3: RetroArch Configuration (SwitchRes Multi-System) */}
               <div className="space-y-2 pt-1 border-t border-neutral-800/60">
-                <div className="font-semibold text-neutral-200">2. Nintendo GameCube & Wii (Dolphin)</div>
+                <div className="flex items-center justify-between">
+                  <div className="font-semibold text-neutral-200 flex items-center gap-2">
+                    <span>2. RetroArch (CRT SwitchRes Multi-Core)</span>
+                    <span className="text-[9px] font-mono px-1.5 py-0.2 bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded">
+                      PS1 / Saturn / SNES / MegaDrive
+                    </span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                  <div className="sm:col-span-3 text-neutral-400 text-[11px]">Executable (.exe):</div>
+                  <div className="sm:col-span-7">
+                    <input
+                      type="text"
+                      value={retroarchExe}
+                      onChange={(e) => setRetroarchExe(e.target.value)}
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded px-2 py-1 text-neutral-300 font-mono text-[11px]"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <button 
+                      onClick={() => setRetroarchExe('C:\\Emulators\\RetroArch\\retroarch.exe')}
+                      className="w-full py-1 bg-neutral-800 hover:bg-neutral-700 rounded text-neutral-300 text-[11px] cursor-pointer"
+                    >
+                      Browse...
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                  <div className="sm:col-span-3 text-neutral-400 text-[11px]">RetroArch ROMs Folder:</div>
+                  <div className="sm:col-span-7">
+                    <input
+                      type="text"
+                      value={retroarchRoms}
+                      onChange={(e) => setRetroarchRoms(e.target.value)}
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded px-2 py-1 text-neutral-300 font-mono text-[11px]"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <button 
+                      onClick={() => setRetroarchRoms('C:\\Games\\RetroArch\\roms')}
+                      className="w-full py-1 bg-neutral-800 hover:bg-neutral-700 rounded text-neutral-300 text-[11px] cursor-pointer"
+                    >
+                      Browse...
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 4: Dolphin Configuration */}
+              <div className="space-y-2 pt-1 border-t border-neutral-800/60">
+                <div className="font-semibold text-neutral-200">3. Nintendo GameCube & Wii (Dolphin)</div>
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                   <div className="sm:col-span-3 text-neutral-400 text-[11px]">Executable (.exe):</div>
                   <div className="sm:col-span-7">

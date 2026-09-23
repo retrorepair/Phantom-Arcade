@@ -34,6 +34,7 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
 
   const systemNames: Record<ConsoleSystem, string> = {
     mame: 'GroovyMAME Arcade (15kHz)',
+    retroarch: 'RetroArch SwitchRes (15kHz)',
     ps2: 'Sony PlayStation 2',
     gamecube: 'Nintendo GameCube',
     wii: 'Nintendo Wii',
@@ -173,6 +174,7 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
               >
                 <option value="all">All Systems</option>
                 <option value="mame">GroovyMAME Arcade</option>
+                <option value="retroarch">RetroArch SwitchRes</option>
                 <option value="ps2">PlayStation 2</option>
                 <option value="gamecube">GameCube</option>
                 <option value="wii">Wii</option>
@@ -371,6 +373,7 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
                       const sys = e.target.value as ConsoleSystem;
                       setNewSystem(sys);
                       if (sys === 'mame') setNewRomPath('C:\\Emulators\\GroovyMAME\\roms\\');
+                      else if (sys === 'retroarch') setNewRomPath('C:\\Games\\RetroArch\\roms\\');
                       else if (sys === 'ps2') setNewRomPath('C:\\Games\\PS2\\');
                       else if (sys === 'gamecube') setNewRomPath('C:\\Games\\GameCube\\');
                       else if (sys === 'wii') setNewRomPath('C:\\Games\\Wii\\');
@@ -380,6 +383,7 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
                     className="w-full bg-neutral-950 border border-neutral-800 rounded px-3 py-2 text-white focus:outline-none focus:border-amber-400"
                   >
                     <option value="mame">GroovyMAME Arcade (15kHz)</option>
+                    <option value="retroarch">RetroArch SwitchRes (15kHz Multi-Core)</option>
                     <option value="ps2">Sony PlayStation 2</option>
                     <option value="gamecube">Nintendo GameCube</option>
                     <option value="wii">Nintendo Wii</option>

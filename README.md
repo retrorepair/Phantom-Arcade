@@ -1,19 +1,19 @@
 # Phantom Arcade — Groovy_MiSTer Client-Server Bridge & Arcade Launcher Suite
 
-> **The Ultimate "Phantom" Arcade Experience**: Run demanding 3D systems (PS2, GameCube, Wii, Sega Naomi 2, Sega Model 2/3, Saturn) from your MiSTer FPGA cabinet with zero perceived latency and 100% native 15kHz CRT arcade video fidelity.
+> **The Ultimate "Phantom" Arcade Experience**: Run demanding 3D & arcade systems (GroovyMAME, RetroArch SwitchRes, GameCube, Wii, Sega Naomi 2, Sega Model 2/3, PS2) from your MiSTer FPGA cabinet with zero perceived latency and 100% native 15kHz CRT arcade video fidelity.
 
 ---
 
 ## Overview
 
-MiSTer FPGA provides cycle-accurate hardware simulation for retro consoles and arcade boards up to 32-bit/64-bit systems. However, heavier 3D platforms like the Sony PlayStation 2, Nintendo GameCube, Nintendo Wii, Sega Naomi 2, and Sega Model 2/3 exceed the logic capacity of the Cyclone V FPGA on the DE10-Nano.
+MiSTer FPGA provides cycle-accurate hardware simulation for retro consoles and arcade boards up to 32-bit/64-bit systems. However, heavier platforms and arcade sets like GroovyMAME with Calamity SwitchRes, RetroArch with CRT super resolutions, Nintendo GameCube, Nintendo Wii, Sega Naomi, and PS2 benefit immensely from high-speed PC server execution streamed directly into the MiSTer FPGA.
 
 **Phantom Arcade** bridges this gap using a decoupled client-server architecture:
-- **Client (MiSTer FPGA DE10-Nano)**: Runs a custom native Linux framebuffer frontend (`/dev/fb0`) that displays an arcade cabinet game menu rendered at native 15kHz CRT resolution. When a game is selected, the client dispatches an ultra-fast UDP command over the local network and immediately boots Calamity's `groovy.rbf` FPGA core into frame-listening mode.
-- **Server (Headless PC)**: A silent background daemon (or the native C++ Windows setup app) listens on UDP port `2154`. It matches the game ID, silently launches the emulator (PCSX2, Dolphin, Flycast, Model 2) in batch fullscreen mode hooked into the Groovy_MiSTer video pipeline, and streams raw 15kHz frames over LAN into `groovy.rbf`.
+- **Client (MiSTer FPGA DE10-Nano)**: Runs a custom native Linux framebuffer frontend (`/dev/fb0` or `Phantom_Arcade.sh`) that displays an arcade cabinet game menu rendered at native 15kHz CRT resolution. When a game is selected, the client dispatches an ultra-fast UDP command over the local network and immediately boots Calamity's `groovy.rbf` FPGA core into frame-listening mode.
+- **Server (Headless PC / Windows App)**: A silent background daemon or native C++ Windows setup app listens on UDP port `1999` (the official Calamity default, customizable in GUI). It matches the game ID, silently launches the emulator (GroovyMAME, RetroArch, Dolphin, Flycast, PCSX2) in batch fullscreen mode hooked into the Groovy_MiSTer video pipeline, and streams raw 15kHz frames over LAN into `groovy.rbf`.
 - **Exit Hotkey Loop**: Holding `P1 Start + Coin` (or Select) for 1.2 seconds triggers the MiSTer input watcher to send a `KILL` UDP packet, terminating the PC emulator process cleanly and returning the cabinet to the native MiSTer menu.
 
-To anyone playing on your arcade cabinet or CRT, **it feels like the MiSTer is running Arcana Heart, Smash Melee, and Daytona USA natively**.
+To anyone playing on your arcade cabinet or CRT, **it feels like the MiSTer is running Street Fighter, Castlevania SOTN, Smash Melee, and Naomi Arcade natively**.
 
 ---
 
@@ -25,10 +25,10 @@ To anyone playing on your arcade cabinet or CRT, **it feels like the MiSTer is r
  │                                                             │
  │   ARM Linux Side (Cortex-A9):                               │
  │   ┌─────────────────────────────────────────────────────┐   │
- │   │  phantom_mister_frontend (Native /dev/fb0 CRT GUI)  │   │
- │   │  - System filter tabs (PS2, GameCube, Wii, Naomi)   │   │
+ │   │  Phantom_Arcade.sh / Framebuffer CRT GUI (/dev/fb0) │   │
+ │   │  - System filter tabs (GroovyMAME, RetroArch, etc.) │   │
  │   │  - Arcade stick input polling (/dev/input/event*)   │   │
- │   │  - Dispatches UDP LAUNCH packet to PC :2154         │   │
+ │   │  - Dispatches UDP LAUNCH packet to PC :1999         │   │
  │   │  - Hotkey supervisor: Start + Coin (1.2s) -> KILL   │   │
  │   └──────────────────────────┬──────────────────────────┘   │
  │                              │ echo "load_core groovy.rbf"  │
@@ -41,24 +41,24 @@ To anyone playing on your arcade cabinet or CRT, **it feels like the MiSTer is r
  └──────────────────────────────▲──────────────────────────────┘
                                 │
                     High-Speed Local LAN (Cat6)
-         Command Bus (UDP :2154) | Video Stream (Groovy Protocol)
+         Command Bus (UDP :1999) | Video Stream (Groovy Protocol)
                                 │
  ┌──────────────────────────────┴──────────────────────────────┐
  │                Headless PC Server (Host Machine)            │
  │                                                             │
  │   ┌─────────────────────────────────────────────────────┐   │
  │   │  Phantom Arcade Daemon / C++ Windows Manager        │   │
- │   │  - Sits silently in system tray / background        │   │
- │   │  - Listens on 0.0.0.0:2154                          │   │
+ │   │  - Native Win32 GUI setup tool                      │   │
+ │   │  - Listens on 0.0.0.0:1999 (configurable)           │   │
  │   │  - Serves games_catalog.json over HTTP :8088        │   │
  │   │  - Spawns & supervises emulator child processes     │   │
  │   └──────────────────────────┬──────────────────────────┘   │
  │                              │ Silent Batch Launch          │
  │                              ▼                              │
  │   ┌─────────────────────────────────────────────────────┐   │
- │   │  Emulators (PCSX2, Dolphin, Flycast, Model 2)       │   │
- │   │  - Direct3D 9 / Vulkan raw framebuffer hook         │   │
- │   │  - Calamity SwitchRes pixel clock & modelines       │   │
+ │   │  Emulators (GroovyMAME, RetroArch, Dolphin, Flycast)│   │
+ │   │  - Direct 15kHz Calamity Groovy_MiSTer SwitchRes    │   │
+ │   │  - Pixel-perfect arcade modelines (CPS, NeoGeo,etc) │   │
  │   └─────────────────────────────────────────────────────┘   │
  └─────────────────────────────────────────────────────────────┘
 ```
@@ -125,18 +125,25 @@ To anyone playing on your arcade cabinet or CRT, **it feels like the MiSTer is r
 
 Choose either of the two simplified installation methods:
 
-#### Method 1: The 1-Line Web Installer (Zero SD card removal)
+#### Method 1: Direct GitHub 1-Line Installer (Recommended — Zero Ambiguity)
+Pulls directly from GitHub's CDN to your MiSTer SD card. Does not require your PC server to be pre-running, and eliminates hangs caused by Windows Firewall blocking port 8088:
 1. On your MiSTer, press **F9** (or SSH into `root@mister.local`).
 2. Run this single command:
    ```bash
-   curl -sSL http://<YOUR_PC_IP>:8088/install | bash
+   curl -k -sSL https://raw.githubusercontent.com/joelwhybrow/phantom-arcade-bridge/main/mister_client/install_mister.sh | bash
    ```
-   *This automatically creates directories, downloads `groovy.rbf`, configures the connection, and installs the menu script.*
+   *This automatically creates directories, downloads `groovy.rbf`, configures the connection, and installs `/media/fat/Scripts/Phantom_Arcade.sh`.*
 
-#### Method 2: Single-File Drop (Zero-Config LAN Auto-Discovery)
+#### Method 2: Direct Script Download via curl
+If you only want the launcher script without running an installer:
+```bash
+curl -k -L -o /media/fat/Scripts/Phantom_Arcade.sh "https://raw.githubusercontent.com/joelwhybrow/phantom-arcade-bridge/main/mister_client/Phantom_Arcade.sh" && chmod +x /media/fat/Scripts/Phantom_Arcade.sh
+```
+
+#### Method 3: Single-File Drop via SD Card
 1. Copy **`Phantom_Arcade.sh`** into your MiSTer SD card at `/media/fat/Scripts/`.
 2. Boot your MiSTer and select **Scripts → Phantom_Arcade**.
-3. **No IP setup required!** The script automatically broadcasts a UDP probe across your local network, discovers your running PC server, fetches your game library, and launches games.
+3. **No manual IP entry required!** The script automatically broadcasts a UDP probe across your local network (testing ports 1999 and 2154), discovers your running PC server, fetches your game library, and launches games.
 4. If `groovy.rbf` is not found, the script will offer to download it automatically over your internet connection.
 
 *(Optional)* For pixel-perfect direct framebuffer graphics on 15kHz CRT, you can also drop the pre-compiled ARM binary **`phantom_mister_frontend`** into `/media/fat/Scripts/`.
