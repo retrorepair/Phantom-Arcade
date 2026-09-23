@@ -463,7 +463,7 @@ void SaveConfiguration() {
         out << "    \"groovymame\": {\n";
         out << "      \"exe\": \"" << ToJsonString(mameExe) << "\",\n";
         out << "      \"roms\": \"" << ToJsonString(mameRoms) << "\",\n";
-        out << "      \"args\": \"-video mister -mister_ip " << ToJsonString(misterIp) << " \\\"{rom_stem}\\\"\",\n";
+        out << "      \"args\": \"-video mister -mister_ip " << ToJsonString(misterIp) << " -switchres 1 -resolution auto \\\"{rom_stem}\\\"\",\n";
         out << "      \"pipeline\": \"Groovy_MiSTer SwitchRes 15kHz Direct\"\n";
         out << "    },\n";
         out << "    \"retroarch\": {\n";
@@ -652,11 +652,11 @@ bool ExecuteLaunchProcess(const std::string& gameId, const std::wstring& targetM
         }
     }
 
-    // Default to GroovyMAME with Calamity 15kHz MiSTer Video Streaming
+    // Default to GroovyMAME with Calamity 15kHz MiSTer Video Streaming & Dynamic SwitchRes
     std::wstring wStem = StringToWstring(stem);
     std::wstring cmd = L"\"" + mameExe + L"\" " + wStem + 
                        L" -video mister -mister_ip " + misterIp + 
-                       L" -skip_gameinfo";
+                       L" -switchres 1 -resolution auto -skip_gameinfo";
 
     if (!mameRoms.empty()) {
         cmd += L" -rompath \"" + mameRoms + L"\"";
@@ -798,31 +798,7 @@ DWORD WINAPI HttpThreadProc(LPVOID lpParam) {
     return 0;
 }
 
-// Background UDP Listener Thread Function
-struct DelayedLaunchInfo {
-    std::string gameId;
-    std::wstring misterClientIp;
-    int delaySec;
-};
 
-static DWORD WINAPI DelayedLaunchThread(LPVOID lpParam) {
-    DelayedLaunchInfo* info = (DelayedLaunchInfo*)lpParam;
-    int delay = info->delaySec;
-    std::string gid = info->gameId;
-    std::wstring ip = info->misterClientIp;
-    delete info;
-
-    if (delay < 1) delay = 3;
-
-    for (int s = delay; s > 0; --s) {
-        std::wstring st = L"Status: MiSTer core initializing... PC launching in " + std::to_wstring(s) + L"s";
-        SetWindowText(hStaticStatus, st.c_str());
-        Sleep(1000);
-    }
-    SetWindowText(hStaticStatus, L"Status: MiSTer core ready. Launching GroovyMAME stream now...");
-    LaunchGame(gid, ip);
-    return 0;
-}
 
 DWORD WINAPI DaemonThreadProc(LPVOID lpParam) {
     int port = g_configuredPort.load();
@@ -887,30 +863,13 @@ DWORD WINAPI DaemonThreadProc(LPVOID lpParam) {
                     gameId.pop_back();
                 }
 
-                // Default 3 seconds PC-side delay before launching emulator!
-                int delaySec = 3;
-                if (hEditLaunchDelay != NULL) {
-                    std::wstring dStr = GetText(hEditLaunchDelay);
-                    if (!dStr.empty()) {
-                        try {
-                            delaySec = std::stoi(dStr);
-                        } catch (...) {}
-                    }
-                }
-
                 size_t dPos = gameId.find(":delay=");
                 if (dPos != std::string::npos) {
-                    try {
-                        delaySec = std::stoi(gameId.substr(dPos + 7));
-                    } catch (...) {}
                     gameId = gameId.substr(0, dPos);
                 }
 
-                if (delaySec < 1) delaySec = 3; // Ensure at least 3 seconds PC-side delay
-
-                DelayedLaunchInfo* info = new DelayedLaunchInfo{ gameId, misterClientIp, delaySec };
-                HANDLE hThread = CreateThread(NULL, 0, DelayedLaunchThread, info, 0, NULL);
-                if (hThread) CloseHandle(hThread);
+                // Call LaunchGame directly — LaunchGame handles the single unified delayed worker thread safely
+                LaunchGame(gameId, misterClientIp);
 
                 std::string reply = "ACK:LAUNCH:OK:" + gameId;
                 sendto(g_udpSocket, reply.c_str(), (int)reply.length(), 0, (sockaddr*)&clientAddr, clientLen);
@@ -1091,20 +1050,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 if (bracketEnd != std::wstring::npos) {
                     std::wstring title = s.substr(bracketEnd + 2);
                     std::string gid(title.begin(), title.end());
-                    int delaySec = 3;
-                    if (hEditLaunchDelay != NULL) {
-                        std::wstring dStr = GetText(hEditLaunchDelay);
-                        if (!dStr.empty()) {
-                            try { delaySec = std::stoi(dStr); } catch (...) {}
-                        }
-                    }
-                    if (delaySec > 0) {
-                        DelayedLaunchInfo* info = new DelayedLaunchInfo{ gid, L"", delaySec };
-                        HANDLE hThread = CreateThread(NULL, 0, DelayedLaunchThread, info, 0, NULL);
-                        if (hThread) CloseHandle(hThread);
-                    } else {
-                        LaunchGame(gid);
-                    }
+                    LaunchGame(gid);
                 }
             }
             break;
@@ -1210,20 +1156,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     gid = std::string(title.begin(), title.end());
                 }
             }
-            int delaySec = 3;
-            if (hEditLaunchDelay != NULL) {
-                std::wstring dStr = GetText(hEditLaunchDelay);
-                if (!dStr.empty()) {
-                    try { delaySec = std::stoi(dStr); } catch (...) {}
-                }
-            }
-            if (delaySec > 0) {
-                DelayedLaunchInfo* info = new DelayedLaunchInfo{ gid, L"", delaySec };
-                HANDLE hThread = CreateThread(NULL, 0, DelayedLaunchThread, info, 0, NULL);
-                if (hThread) CloseHandle(hThread);
-            } else {
-                LaunchGame(gid);
-            }
+            LaunchGame(gid);
             break;
         }
         case IDC_BTN_TOGGLE_DAEMON:
