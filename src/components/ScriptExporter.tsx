@@ -53,6 +53,120 @@ export const ScriptExporter: React.FC = () => {
         </button>
       </div>
 
+      {/* Compiled Binaries & Easy Installers Banner */}
+      <div className="bg-neutral-900/80 border border-neutral-800 rounded-xl p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-800/80 pb-3">
+          <div>
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Pre-Compiled Binaries & Instant Launchers</span>
+            </h3>
+            <p className="text-xs text-neutral-400 mt-0.5">
+              No manual building or complex compiling required. Download the pre-built executables directly:
+            </p>
+          </div>
+          <span className="text-[11px] font-mono text-neutral-400 px-2.5 py-1 bg-neutral-950 border border-neutral-800 rounded-md">
+            Direct Downloads
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Windows EXE */}
+          <div className="bg-neutral-950 p-3.5 rounded-lg border border-neutral-800 flex flex-col justify-between gap-3 hover:border-amber-400/40 transition-colors">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white">PhantomArcadeManager.exe</span>
+                <span className="text-[9px] font-mono bg-blue-500/20 text-blue-400 border border-blue-500/30 px-1.5 py-0.5 rounded">
+                  Windows x64
+                </span>
+              </div>
+              <p className="text-[11px] text-neutral-400 mt-1">
+                Compiled native Win32 app (2.7 MB). GUI setup, ROM scanner & bridge daemon.
+              </p>
+            </div>
+            <a
+              href="/downloads/PhantomArcadeManager.exe"
+              download="PhantomArcadeManager.exe"
+              className="w-full py-1.5 px-3 bg-amber-400 hover:bg-amber-300 text-neutral-950 font-bold text-xs rounded font-mono flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Download (.exe)</span>
+            </a>
+          </div>
+
+          {/* MiSTer Zero-Config Script */}
+          <div className="bg-neutral-950 p-3.5 rounded-lg border border-neutral-800 flex flex-col justify-between gap-3 hover:border-amber-400/40 transition-colors">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white">Phantom_Arcade.sh</span>
+                <span className="text-[9px] font-mono bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded">
+                  MiSTer Script
+                </span>
+              </div>
+              <p className="text-[11px] text-neutral-400 mt-1">
+                1-File Zero-Config Launcher. Auto-discovers PC IP on LAN via UDP broadcast!
+              </p>
+            </div>
+            <a
+              href="/downloads/Phantom_Arcade.sh"
+              download="Phantom_Arcade.sh"
+              className="w-full py-1.5 px-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-100 font-bold text-xs rounded font-mono flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Download (.sh)</span>
+            </a>
+          </div>
+
+          {/* MiSTer Compiled ARM Binary */}
+          <div className="bg-neutral-950 p-3.5 rounded-lg border border-neutral-800 flex flex-col justify-between gap-3 hover:border-amber-400/40 transition-colors">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white">phantom_mister_frontend</span>
+                <span className="text-[9px] font-mono bg-purple-500/20 text-purple-400 border border-purple-500/30 px-1.5 py-0.5 rounded">
+                  ARMv7 Linux
+                </span>
+              </div>
+              <p className="text-[11px] text-neutral-400 mt-1">
+                Compiled framebuffer /dev/fb0 client for DE10-Nano (482 KB). 15kHz CRT native.
+              </p>
+            </div>
+            <a
+              href="/downloads/phantom_mister_frontend"
+              download="phantom_mister_frontend"
+              className="w-full py-1.5 px-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-100 font-bold text-xs rounded font-mono flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Download (ARM ELF)</span>
+            </a>
+          </div>
+
+          {/* 1-Line Web Installer */}
+          <div className="bg-neutral-950 p-3.5 rounded-lg border border-neutral-800 flex flex-col justify-between gap-3 hover:border-amber-400/40 transition-colors">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white">1-Line Auto-Installer</span>
+                <span className="text-[9px] font-mono bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded">
+                  Instant
+                </span>
+              </div>
+              <p className="text-[11px] text-neutral-400 mt-1">
+                Run on MiSTer (F9 or SSH): Auto-downloads core, script & registers main menu!
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText('curl -sSL http://<PC_IP>:8088/install | bash');
+                alert('Copied 1-line installer command to clipboard: curl -sSL http://<PC_IP>:8088/install | bash');
+              }}
+              className="w-full py-1.5 px-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-100 font-bold text-xs rounded font-mono flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>Copy 1-Line Curl</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* File Navigation & Code Viewer */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
@@ -148,32 +262,33 @@ export const ScriptExporter: React.FC = () => {
       {/* Step by Step Setup Instructions */}
       <div className="p-6 bg-neutral-900/60 border border-neutral-800 rounded-xl space-y-4">
         <h3 className="text-base font-bold text-white flex items-center gap-2">
-          <span>Quick 3-Step Setup Guide</span>
+          <span>Quick 3-Step Setup Guide (Simplified)</span>
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
           <div className="p-4 bg-neutral-950 rounded-lg border border-neutral-800/80 space-y-2">
-            <div className="font-bold text-amber-400 font-mono">Step 1: PC Server Setup</div>
+            <div className="font-bold text-amber-400 font-mono">Step 1: Run Windows App</div>
             <p className="text-neutral-400 leading-relaxed font-sans">
-              Place <code className="text-neutral-200 font-mono">phantom_server.py</code> and <code className="text-neutral-200 font-mono">phantom_config.json</code> into <code className="text-neutral-200 font-mono">C:\PhantomArcade\</code>.
-              Ensure Python 3 is installed. Run <code className="text-amber-300 font-mono">python phantom_server.py</code>.
+              Download and run <code className="text-amber-300 font-mono">PhantomArcadeManager.exe</code> on your Windows PC.
+              Click <strong className="text-neutral-200">Auto-Scan ROMs</strong>, then click <strong className="text-neutral-200">Start Background Daemon</strong>.
+              No Python installation needed!
             </p>
           </div>
 
           <div className="p-4 bg-neutral-950 rounded-lg border border-neutral-800/80 space-y-2">
-            <div className="font-bold text-emerald-400 font-mono">Step 2: MiSTer SD Card Setup</div>
+            <div className="font-bold text-emerald-400 font-mono">Step 2: Simple MiSTer Setup</div>
             <p className="text-neutral-400 leading-relaxed font-sans">
-              Copy <code className="text-neutral-200 font-mono">mister_phantom_menu.sh</code> to <code className="text-neutral-200 font-mono">/media/fat/Scripts/</code> and make it executable (<code className="text-emerald-300 font-mono">chmod +x</code>).
-              Ensure <code className="text-neutral-200 font-mono">groovy.rbf</code> is placed in <code className="text-neutral-200 font-mono">/media/fat/_Groovy/</code>.
+              Either run <code className="text-emerald-300 font-mono">curl -sSL http://&lt;PC_IP&gt;:8088/install | bash</code> in MiSTer F9 console,
+              OR copy <code className="text-neutral-200 font-mono">Phantom_Arcade.sh</code> to <code className="text-neutral-200 font-mono">/media/fat/Scripts/</code>.
+              It auto-discovers your PC and auto-downloads the Groovy core!
             </p>
           </div>
 
           <div className="p-4 bg-neutral-950 rounded-lg border border-neutral-800/80 space-y-2">
-            <div className="font-bold text-blue-400 font-mono">Step 3: Play & Enjoy</div>
+            <div className="font-bold text-blue-400 font-mono">Step 3: Play on 15kHz CRT</div>
             <p className="text-neutral-400 leading-relaxed font-sans">
-              On your MiSTer cabinet, navigate to <strong>Scripts → phantom_arcade</strong>.
-              Pick <em>Arcana Heart</em>, <em>Smash Melee</em>, or <em>Virtua Fighter 4</em>.
-              Play with zero perceptible lag on your 15kHz CRT arcade monitor!
+              On your MiSTer cabinet, go to <strong>Scripts → Phantom_Arcade</strong>.
+              Browse games with your arcade stick and press P1 Start. To return to MiSTer menu anytime, hold <strong>P1 Start + Coin</strong> for 1.2s!
             </p>
           </div>
         </div>

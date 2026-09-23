@@ -185,6 +185,37 @@ export const ArcadeSimulator: React.FC<ArcadeSimulatorProps> = ({
       </div>
 
       {/* Main Split Simulator Area: MiSTer Cabinet on Left, PC Server on Right */}
+      {/* Zero-Config MiSTer & PC Quick Bar */}
+      <div className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-3 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-3">
+          <div className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+          <div className="text-neutral-300">
+            <span className="font-bold text-white">MiSTer Setup (Super Simple): </span>
+            <span className="text-neutral-400 font-mono text-[11px] bg-neutral-950 px-2 py-0.5 rounded border border-neutral-800">
+              curl -sSL http://&lt;PC_IP&gt;:8088/install | bash
+            </span>
+            <span className="text-neutral-400 ml-2 hidden sm:inline">or drop Phantom_Arcade.sh into /media/fat/Scripts/</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 self-start md:self-auto shrink-0 font-mono text-[11px]">
+          <a
+            href="/downloads/PhantomArcadeManager.exe"
+            download="PhantomArcadeManager.exe"
+            className="px-2.5 py-1 bg-amber-400 hover:bg-amber-300 text-neutral-950 font-bold rounded flex items-center gap-1 transition-colors cursor-pointer"
+          >
+            <span>Windows EXE</span>
+          </a>
+          <a
+            href="/downloads/Phantom_Arcade.sh"
+            download="Phantom_Arcade.sh"
+            className="px-2.5 py-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded flex items-center gap-1 transition-colors cursor-pointer"
+          >
+            <span>MiSTer Script</span>
+          </a>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* LEFT PANEL: MiSTer Arcade Cabinet & CRT Screen (7 Cols) */}

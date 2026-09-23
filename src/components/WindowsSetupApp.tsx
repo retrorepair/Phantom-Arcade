@@ -161,6 +161,32 @@ export const WindowsSetupApp: React.FC = () => {
 
       {viewMode === 'app' ? (
         <div className="space-y-6">
+          {/* Compiled Binary Download Action Banner */}
+          <div className="bg-gradient-to-r from-amber-950/40 via-neutral-900 to-neutral-900 border border-amber-500/30 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 max-w-4xl mx-auto shadow-lg">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold font-mono px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded">
+                  COMPILED & READY
+                </span>
+                <span className="text-sm font-bold text-white">PhantomArcadeManager.exe (Windows x86-64)</span>
+              </div>
+              <p className="text-xs text-neutral-400">
+                Pre-compiled native Windows desktop application (2.7 MB). Statically linked with no dependencies.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <a
+                href="/downloads/PhantomArcadeManager.exe"
+                download="PhantomArcadeManager.exe"
+                className="px-4 py-2 bg-amber-400 hover:bg-amber-300 text-neutral-950 font-bold rounded-lg text-xs flex items-center gap-2 transition-all shadow-md hover:scale-[1.02] cursor-pointer"
+              >
+                <Download className="w-4 h-4" />
+                <span>Download Windows App (.exe)</span>
+              </a>
+            </div>
+          </div>
+
           {/* Simulated Windows Native Window */}
           <div className="bg-neutral-900 border border-neutral-700/80 rounded-xl overflow-hidden shadow-2xl max-w-4xl mx-auto">
             

@@ -574,6 +574,67 @@ add_executable(PhantomArcadeManager WIN32 PhantomArcadeManager.cpp)
 target_link_libraries(PhantomArcadeManager PRIVATE ws2_32 comctl32 shell32 user32 gdi32)`
   },
   {
+    filename: 'Phantom_Arcade.sh',
+    targetPlatform: 'MiSTer FPGA (Linux ARM)',
+    destinationPath: '/media/fat/Scripts/Phantom_Arcade.sh',
+    description: 'All-in-one Zero-Config MiSTer launcher. Automatically discovers your PC on the LAN, auto-downloads groovy.rbf if missing, and renders the arcade CRT menu.',
+    language: 'bash',
+    code: `#!/usr/bin/env bash
+# =============================================================================
+# Phantom Arcade — All-in-One MiSTer FPGA Client (Zero-Config)
+# Copy this single file to: /media/fat/Scripts/Phantom_Arcade.sh
+# =============================================================================
+CONFIG_FILE="/media/fat/config/phantom.ini"
+GROOVY_CORE="/media/fat/_Groovy/groovy.rbf"
+UDP_PORT=2154
+HTTP_PORT=8088
+
+# 1. Auto-download Groovy_MiSTer core if missing
+if [ ! -f "$GROOVY_CORE" ]; then
+    echo "[!] Downloading Groovy_MiSTer core..."
+    mkdir -p "/media/fat/_Groovy"
+    curl -k -L -o "$GROOVY_CORE" "https://raw.githubusercontent.com/MiSTer-devel/Groovy_MiSTer/main/releases/groovy.rbf"
+fi
+
+# 2. LAN UDP Auto-Discovery (Zero manual IP entry!)
+PC_IP=$(python3 -c "
+import socket
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+s.settimeout(2.0)
+try:
+    s.sendto(b'DISCOVER_PHANTOM', ('255.255.255.255', 2154))
+    data, addr = s.recvfrom(1024)
+    if 'PHANTOM_HOST' in data.decode('utf-8', errors='ignore'):
+        print(addr[0])
+except:
+    pass
+" 2>/dev/null)
+
+if [ -z "$PC_IP" ] && [ -f "$CONFIG_FILE" ]; then
+    PC_IP=$(grep -E "^PC_SERVER_IP=" "$CONFIG_FILE" | cut -d'=' -f2)
+fi
+
+echo "[*] Connected to PC Server at: $PC_IP"
+curl -s "http://$PC_IP:$HTTP_PORT/catalog.json" -o /tmp/phantom_catalog.json
+# Launches games via UDP LAUNCH:<id> and loads groovy.rbf`
+  },
+  {
+    filename: 'install_mister.sh',
+    targetPlatform: 'MiSTer FPGA (Linux ARM)',
+    destinationPath: 'Run via: curl -sSL http://<PC_IP>:8088/install | bash',
+    description: '1-Line automatic installer script for MiSTer. Sets up directories, cores, scripts, and config in seconds.',
+    language: 'bash',
+    code: `#!/usr/bin/env bash
+# Run on MiSTer (Press F9 or SSH):
+#   curl -sSL http://<YOUR_PC_IP>:8088/install | bash
+mkdir -p /media/fat/_Groovy /media/fat/Scripts /media/fat/config
+curl -k -L -o /media/fat/_Groovy/groovy.rbf "https://raw.githubusercontent.com/MiSTer-devel/Groovy_MiSTer/main/releases/groovy.rbf"
+curl -sSL "http://\${1:-192.168.1.100}:8088/mister_script" -o /media/fat/Scripts/Phantom_Arcade.sh
+chmod +x /media/fat/Scripts/Phantom_Arcade.sh
+echo "[✓] Phantom Arcade installed! Find it in MiSTer Main Menu -> Scripts."`
+  },
+  {
     filename: 'README.md',
     targetPlatform: 'Documentation',
     destinationPath: 'README.md',

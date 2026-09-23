@@ -8,6 +8,7 @@
  *   Native Windows desktop setup tool and daemon launcher for the Phantom Arcade
  *   Groovy_MiSTer bridge. Allows users to point to ROM folders, emulator paths,
  *   set MiSTer IP, auto-scan games, and start/stop the background UDP daemon.
+ *   Includes Auto-Discovery responder for zero-config MiSTer client setup!
  * ============================================================================
  */
 
@@ -21,6 +22,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <commctrl.h>
+#include <commdlg.h>
 #include <shlobj.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -29,12 +31,12 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <thread>
 #include <atomic>
 #include <filesystem>
 
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "comctl32.lib")
+#pragma comment(lib, "comdlg32.lib")
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
@@ -76,7 +78,7 @@ HWND hBtnToggleDaemon;
 std::atomic<bool> g_daemonRunning(false);
 std::atomic<DWORD> g_activePid(0);
 SOCKET g_udpSocket = INVALID_SOCKET;
-std::thread g_daemonThread;
+HANDLE g_hDaemonThread = NULL;
 
 // Helper: Browse for Folder
 std::wstring BrowseFolder(HWND hWnd, const wchar_t* title) {
@@ -270,8 +272,8 @@ void TestMisterHandshake() {
     WSACleanup();
 }
 
-// Background UDP Daemon Thread
-void DaemonWorker() {
+// Background UDP Daemon Worker Thread Function
+DWORD WINAPI DaemonThreadProc(LPVOID lpParam) {
     WSADATA wsa;
     WSAStartup(MAKEWORD(2, 2), &wsa);
 
@@ -290,15 +292,20 @@ void DaemonWorker() {
     while (g_daemonRunning) {
         int bytes = recvfrom(g_udpSocket, buffer, sizeof(buffer) - 1, 0, (sockaddr*)&clientAddr, &clientLen);
         if (bytes > 0) {
-            buffer[bytes] = '\\0';
+            buffer[bytes] = '\0';
             std::string msg(buffer);
 
-            if (msg.rfind("LAUNCH:", 0) == 0) {
+            if (msg.rfind("DISCOVER_PHANTOM", 0) == 0) {
+                // Auto-discovery response
+                const char* reply = "PHANTOM_HOST_ONLINE";
+                sendto(g_udpSocket, reply, (int)strlen(reply), 0, (sockaddr*)&clientAddr, clientLen);
+            } else if (msg.rfind("LAUNCH:", 0) == 0) {
                 std::string gameId = msg.substr(7);
-                // Launch logic...
-                sendto(g_udpSocket, "ACK:LAUNCH:OK", 13, 0, (sockaddr*)&clientAddr, clientLen);
+                // Launch requested emulator process...
+                const char* reply = "ACK:LAUNCH:OK";
+                sendto(g_udpSocket, reply, (int)strlen(reply), 0, (sockaddr*)&clientAddr, clientLen);
             } else if (msg == "KILL") {
-                // Kill active emulator PID...
+                // Terminate active child process
                 if (g_activePid > 0) {
                     HANDLE hProc = OpenProcess(PROCESS_TERMINATE, FALSE, g_activePid);
                     if (hProc) {
@@ -307,31 +314,36 @@ void DaemonWorker() {
                     }
                     g_activePid = 0;
                 }
-                sendto(g_udpSocket, "ACK:KILL:OK", 11, 0, (sockaddr*)&clientAddr, clientLen);
+                const char* reply = "ACK:KILL:OK";
+                sendto(g_udpSocket, reply, (int)strlen(reply), 0, (sockaddr*)&clientAddr, clientLen);
             } else if (msg == "PING") {
-                sendto(g_udpSocket, "PONG", 4, 0, (sockaddr*)&clientAddr, clientLen);
+                const char* reply = "PONG";
+                sendto(g_udpSocket, reply, (int)strlen(reply), 0, (sockaddr*)&clientAddr, clientLen);
             }
         }
     }
 
     closesocket(g_udpSocket);
     WSACleanup();
+    return 0;
 }
 
 // Toggle Daemon State
 void ToggleDaemon() {
     if (!g_daemonRunning) {
         g_daemonRunning = true;
-        g_daemonThread = std::thread(DaemonWorker);
+        g_hDaemonThread = CreateThread(NULL, 0, DaemonThreadProc, NULL, 0, NULL);
         SetWindowText(hBtnToggleDaemon, L"Stop Background Daemon");
-        SetWindowText(hStaticStatus, L"Status: Daemon ACTIVE (Listening on UDP :2154)");
+        SetWindowText(hStaticStatus, L"Status: Daemon ACTIVE (Listening on UDP :2154 with Auto-Discovery)");
     } else {
         g_daemonRunning = false;
         if (g_udpSocket != INVALID_SOCKET) {
             closesocket(g_udpSocket);
         }
-        if (g_daemonThread.joinable()) {
-            g_daemonThread.join();
+        if (g_hDaemonThread) {
+            WaitForSingleObject(g_hDaemonThread, 1000);
+            CloseHandle(g_hDaemonThread);
+            g_hDaemonThread = NULL;
         }
         SetWindowText(hBtnToggleDaemon, L"Start Background Daemon");
         SetWindowText(hStaticStatus, L"Status: Daemon Stopped");
@@ -352,34 +364,34 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         // PCSX2 Executable & ROMs
         y += 35;
         CreateWindow(L"STATIC", L"PCSX2 Executable:", WS_CHILD | WS_VISIBLE, 20, y, 180, 20, hWnd, NULL, hInst, NULL);
-        hEditPcsx2Exe = CreateWindow(L"EDIT", L"C:\\\\Emulators\\\\PCSX2\\\\pcsx2-qt.exe", WS_CHILD | WS_VISIBLE | WS_BORDER, 210, y, 340, 22, hWnd, (HMENU)IDC_EDIT_PCSX2_EXE, hInst, NULL);
+        hEditPcsx2Exe = CreateWindow(L"EDIT", L"C:\\Emulators\\PCSX2\\pcsx2-qt.exe", WS_CHILD | WS_VISIBLE | WS_BORDER, 210, y, 340, 22, hWnd, (HMENU)IDC_EDIT_PCSX2_EXE, hInst, NULL);
         CreateWindow(L"BUTTON", L"Browse...", WS_CHILD | WS_VISIBLE, 560, y, 80, 22, hWnd, (HMENU)IDC_BTN_BROWSE_PCSX2, hInst, NULL);
 
         y += 30;
         CreateWindow(L"STATIC", L"PS2 ROMs Folder:", WS_CHILD | WS_VISIBLE, 20, y, 180, 20, hWnd, NULL, hInst, NULL);
-        hEditPs2Roms = CreateWindow(L"EDIT", L"C:\\\\Games\\\\PS2", WS_CHILD | WS_VISIBLE | WS_BORDER, 210, y, 340, 22, hWnd, (HMENU)IDC_EDIT_PS2_ROMS, hInst, NULL);
+        hEditPs2Roms = CreateWindow(L"EDIT", L"C:\\Games\\PS2", WS_CHILD | WS_VISIBLE | WS_BORDER, 210, y, 340, 22, hWnd, (HMENU)IDC_EDIT_PS2_ROMS, hInst, NULL);
         CreateWindow(L"BUTTON", L"Browse...", WS_CHILD | WS_VISIBLE, 560, y, 80, 22, hWnd, (HMENU)IDC_BTN_BROWSE_PS2ROMS, hInst, NULL);
 
         // Dolphin Executable & ROMs
         y += 35;
         CreateWindow(L"STATIC", L"Dolphin Executable:", WS_CHILD | WS_VISIBLE, 20, y, 180, 20, hWnd, NULL, hInst, NULL);
-        hEditDolphinExe = CreateWindow(L"EDIT", L"C:\\\\Emulators\\\\Dolphin\\\\Dolphin.exe", WS_CHILD | WS_VISIBLE | WS_BORDER, 210, y, 340, 22, hWnd, (HMENU)IDC_EDIT_DOLPHIN_EXE, hInst, NULL);
+        hEditDolphinExe = CreateWindow(L"EDIT", L"C:\\Emulators\\Dolphin\\Dolphin.exe", WS_CHILD | WS_VISIBLE | WS_BORDER, 210, y, 340, 22, hWnd, (HMENU)IDC_EDIT_DOLPHIN_EXE, hInst, NULL);
         CreateWindow(L"BUTTON", L"Browse...", WS_CHILD | WS_VISIBLE, 560, y, 80, 22, hWnd, (HMENU)IDC_BTN_BROWSE_DOLPHIN, hInst, NULL);
 
         y += 30;
         CreateWindow(L"STATIC", L"GameCube/Wii ROMs:", WS_CHILD | WS_VISIBLE, 20, y, 180, 20, hWnd, NULL, hInst, NULL);
-        hEditGcRoms = CreateWindow(L"EDIT", L"C:\\\\Games\\\\GameCube", WS_CHILD | WS_VISIBLE | WS_BORDER, 210, y, 340, 22, hWnd, (HMENU)IDC_EDIT_GC_ROMS, hInst, NULL);
+        hEditGcRoms = CreateWindow(L"EDIT", L"C:\\Games\\GameCube", WS_CHILD | WS_VISIBLE | WS_BORDER, 210, y, 340, 22, hWnd, (HMENU)IDC_EDIT_GC_ROMS, hInst, NULL);
         CreateWindow(L"BUTTON", L"Browse...", WS_CHILD | WS_VISIBLE, 560, y, 80, 22, hWnd, (HMENU)IDC_BTN_BROWSE_GCROMS, hInst, NULL);
 
         // Flycast
         y += 35;
         CreateWindow(L"STATIC", L"Flycast Executable:", WS_CHILD | WS_VISIBLE, 20, y, 180, 20, hWnd, NULL, hInst, NULL);
-        hEditFlycastExe = CreateWindow(L"EDIT", L"C:\\\\Emulators\\\\Flycast\\\\flycast.exe", WS_CHILD | WS_VISIBLE | WS_BORDER, 210, y, 340, 22, hWnd, (HMENU)IDC_EDIT_FLYCAST_EXE, hInst, NULL);
+        hEditFlycastExe = CreateWindow(L"EDIT", L"C:\\Emulators\\Flycast\\flycast.exe", WS_CHILD | WS_VISIBLE | WS_BORDER, 210, y, 340, 22, hWnd, (HMENU)IDC_EDIT_FLYCAST_EXE, hInst, NULL);
         CreateWindow(L"BUTTON", L"Browse...", WS_CHILD | WS_VISIBLE, 560, y, 80, 22, hWnd, (HMENU)IDC_BTN_BROWSE_FLYCAST, hInst, NULL);
 
         y += 30;
         CreateWindow(L"STATIC", L"Naomi/Arcade ROMs:", WS_CHILD | WS_VISIBLE, 20, y, 180, 20, hWnd, NULL, hInst, NULL);
-        hEditNaomiRoms = CreateWindow(L"EDIT", L"C:\\\\Games\\\\Arcade\\\\Naomi", WS_CHILD | WS_VISIBLE | WS_BORDER, 210, y, 340, 22, hWnd, (HMENU)IDC_EDIT_NAOMI_ROMS, hInst, NULL);
+        hEditNaomiRoms = CreateWindow(L"EDIT", L"C:\\Games\\Arcade\\Naomi", WS_CHILD | WS_VISIBLE | WS_BORDER, 210, y, 340, 22, hWnd, (HMENU)IDC_EDIT_NAOMI_ROMS, hInst, NULL);
         CreateWindow(L"BUTTON", L"Browse...", WS_CHILD | WS_VISIBLE, 560, y, 80, 22, hWnd, (HMENU)IDC_BTN_BROWSE_NAOMI, hInst, NULL);
 
         // Action Buttons Row
@@ -405,7 +417,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         int wmId = LOWORD(wParam);
         switch (wmId) {
         case IDC_BTN_BROWSE_PCSX2: {
-            auto path = BrowseFile(hWnd, L"PCSX2 Executable (*.exe)\\0*.exe\\0All Files (*.*)\\0*.*\\0");
+            auto path = BrowseFile(hWnd, L"PCSX2 Executable (*.exe)\0*.exe\0All Files (*.*)\0*.*\0");
             if (!path.empty()) SetWindowText(hEditPcsx2Exe, path.c_str());
             break;
         }
@@ -415,7 +427,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             break;
         }
         case IDC_BTN_BROWSE_DOLPHIN: {
-            auto path = BrowseFile(hWnd, L"Dolphin Executable (*.exe)\\0*.exe\\0All Files (*.*)\\0*.*\\0");
+            auto path = BrowseFile(hWnd, L"Dolphin Executable (*.exe)\0*.exe\0All Files (*.*)\0*.*\0");
             if (!path.empty()) SetWindowText(hEditDolphinExe, path.c_str());
             break;
         }
@@ -425,7 +437,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             break;
         }
         case IDC_BTN_BROWSE_FLYCAST: {
-            auto path = BrowseFile(hWnd, L"Flycast Executable (*.exe)\\0*.exe\\0All Files (*.*)\\0*.*\\0");
+            auto path = BrowseFile(hWnd, L"Flycast Executable (*.exe)\0*.exe\0All Files (*.*)\0*.*\0");
             if (!path.empty()) SetWindowText(hEditFlycastExe, path.c_str());
             break;
         }
@@ -454,7 +466,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         if (g_daemonRunning) {
             g_daemonRunning = false;
             if (g_udpSocket != INVALID_SOCKET) closesocket(g_udpSocket);
-            if (g_daemonThread.joinable()) g_daemonThread.join();
+            if (g_hDaemonThread) {
+                WaitForSingleObject(g_hDaemonThread, 1000);
+                CloseHandle(g_hDaemonThread);
+            }
         }
         PostQuitMessage(0);
         break;

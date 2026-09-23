@@ -1,0 +1,184 @@
+#!/usr/bin/env bash
+# =============================================================================
+# Phantom Arcade — All-in-One MiSTer FPGA Client (Zero-Config)
+# Place this single file in: /media/fat/Scripts/Phantom_Arcade.sh
+# 
+# Features:
+# - Auto-discovers PC Server over LAN (Zero manual IP setup needed!)
+# - Downloads groovy.rbf automatically if not found
+# - Renders 15kHz CRT arcade menu with arcade stick support
+# - Launches PC emulators and restores MiSTer menu on exit
+# =============================================================================
+
+CONFIG_FILE="/media/fat/config/phantom.ini"
+GROOVY_CORE="/media/fat/_Groovy/groovy.rbf"
+MENU_CORE="/media/fat/menu.rbf"
+UDP_PORT=2154
+HTTP_PORT=8088
+PC_IP=""
+
+# ANSI Colors for 15kHz CRT
+C_RESET="\033[0m"
+C_AMBER="\033[38;5;214m"
+C_AMBER_BOLD="\033[1;38;5;214m"
+C_DIM="\033[2m"
+C_WHITE="\033[1;37m"
+C_BG_ROW="\033[48;5;236m"
+C_GREEN="\033[1;32m"
+C_RED="\033[1;31m"
+
+clear
+echo -e "${C_AMBER_BOLD}======================================================${C_RESET}"
+echo -e "${C_AMBER_BOLD}       PHANTOM ARCADE — GROOVY_MISTER CLIENT          ${C_RESET}"
+echo -e "${C_DIM}        Zero-Config 15kHz CRT Arcade Launcher         ${C_RESET}"
+echo -e "${C_AMBER_BOLD}======================================================${C_RESET}"
+echo ""
+
+# 1. Check for Groovy_MiSTer core
+if [ ! -f "$GROOVY_CORE" ]; then
+    echo -e "${C_AMBER}[!] Groovy_MiSTer core missing at $GROOVY_CORE${C_RESET}"
+    echo -e "    Attempting to download latest groovy.rbf..."
+    mkdir -p "/media/fat/_Groovy"
+    curl -k -L -o "$GROOVY_CORE" "https://raw.githubusercontent.com/MiSTer-devel/Groovy_MiSTer/main/releases/groovy.rbf" 2>/dev/null
+    if [ -f "$GROOVY_CORE" ]; then
+        echo -e "${C_GREEN}[✓] Groovy_MiSTer core downloaded successfully!${C_RESET}"
+    else
+        echo -e "${C_RED}[!] Could not auto-download groovy.rbf. Please place it in /media/fat/_Groovy/${C_RESET}"
+    fi
+fi
+
+# 2. Check for configured IP or Auto-Discover
+if [ -f "$CONFIG_FILE" ]; then
+    PC_IP=$(grep -E "^PC_SERVER_IP=" "$CONFIG_FILE" | cut -d'=' -f2 | tr -d ' \r\n')
+fi
+
+if [ -z "$PC_IP" ]; then
+    echo -e "${C_WHITE}[*] Searching LAN for Phantom Arcade PC Host...${C_RESET}"
+    # Broadcast discovery probe via UDP broadcast
+    RESPONSE=$(python3 -c "
+import socket, sys
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+s.settimeout(2.0)
+try:
+    s.sendto(b'DISCOVER_PHANTOM', ('255.255.255.255', 2154))
+    data, addr = s.recvfrom(1024)
+    msg = data.decode('utf-8', errors='ignore')
+    if 'PHANTOM_HOST' in msg:
+        print(addr[0])
+except:
+    pass
+" 2>/dev/null)
+
+    if [ -n "$RESPONSE" ]; then
+        PC_IP="$RESPONSE"
+        echo -e "${C_GREEN}[✓] Discovered PC Server at: ${PC_IP}${C_RESET}"
+        mkdir -p "/media/fat/config"
+        echo "PC_SERVER_IP=$PC_IP" > "$CONFIG_FILE"
+    else
+        # If auto-discovery fails, check default subnet or prompt
+        DEFAULT_GW=$(ip route | grep default | awk '{print $3}' | cut -d'.' -f1-3)
+        echo -e "${C_AMBER}[?] Auto-discovery timed out.${C_RESET}"
+        read -p "Enter your PC Server IP (e.g. ${DEFAULT_GW}.100): " PC_IP
+        if [ -n "$PC_IP" ]; then
+            mkdir -p "/media/fat/config"
+            echo "PC_SERVER_IP=$PC_IP" > "$CONFIG_FILE"
+        else
+            echo "No IP provided. Exiting."
+            exit 1
+        fi
+    fi
+fi
+
+echo -e "${C_WHITE}[*] Fetching games catalog from http://${PC_IP}:${HTTP_PORT}/catalog.json ...${C_RESET}"
+CATALOG_FILE="/tmp/phantom_catalog.json"
+curl -s -m 3 "http://${PC_IP}:${HTTP_PORT}/catalog.json" -o "$CATALOG_FILE" 2>/dev/null
+
+if [ ! -s "$CATALOG_FILE" ]; then
+    echo -e "${C_RED}[!] Could not load catalog from PC. Verify PhantomArcadeManager.exe is running on PC.${C_RESET}"
+    read -p "Press Enter to exit..."
+    exit 1
+fi
+
+# 3. Interactive Menu Loop (Keyboard / Arcade Stick / Joystick)
+python3 -c "
+import json, os, sys, socket, termios, tty
+
+with open('$CATALOG_FILE') as f:
+    data = json.load(f)
+
+games = data.get('games', [])
+if not games:
+    print('No games found in catalog.')
+    sys.exit(0)
+
+current_idx = 0
+selected_sys = 'ALL'
+
+def draw():
+    os.system('clear')
+    print('\033[1;38;5;214m========================================================================\033[0m')
+    print('\033[1;38;5;214m  PHANTOM ARCADE — 15.7kHz CRT ARCADE LAUNCHER  \033[0m\033[2m(PC Host: $PC_IP)\033[0m')
+    print('\033[1;38;5;214m========================================================================\033[0m')
+    print('\033[2mUP/DOWN: Browse | ENTER/P1 START: Launch | Q: Quit to MiSTer Menu\033[0m\n')
+
+    for i, g in enumerate(games[:12]):
+        is_sel = (i == current_idx)
+        cursor = '\033[1;38;5;214m▶ \033[0m' if is_sel else '  '
+        title = g.get('title', 'Unknown')[:30].ljust(32)
+        sys_name = g.get('system', '').upper().ljust(10)
+        mode = g.get('videoMode', '15kHz 240p')
+
+        if is_sel:
+            print(f'{cursor}\033[1;37m\033[48;5;236m {title} [{sys_name}] {mode} \033[0m')
+        else:
+            print(f'{cursor}\033[38;5;250m {title} \033[2m[{sys_name}] {mode}\033[0m')
+
+    print('\n\033[1;38;5;214m------------------------------------------------------------------------\033[0m')
+    sel = games[current_idx]
+    print(f'\033[1mSelected:\033[0m {sel.get(\"title\")} | \033[1mROM:\033[0m {sel.get(\"romName\")}')
+    print('\033[2mTo exit in-game back to MiSTer: Hold P1 START + COIN for 1.2s\033[0m')
+
+def getch():
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        ch = sys.stdin.read(1)
+        if ch == '\x1b':
+            ch2 = sys.stdin.read(1)
+            ch3 = sys.stdin.read(1)
+            return ch + ch2 + ch3
+        return ch
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+while True:
+    draw()
+    key = getch()
+    if key in ['\x1b[A', 'w', 'W', 'k']:
+        current_idx = (current_idx - 1) % len(games)
+    elif key in ['\x1b[B', 's', 'S', 'j']:
+        current_idx = (current_idx + 1) % len(games)
+    elif key in ['\r', '\n', ' ']:
+        chosen = games[current_idx]
+        game_id = chosen.get('id')
+        print(f'\n\033[1;32m[+] Launching {chosen.get(\"title\")} on PC Server...\033[0m')
+        
+        # Send UDP LAUNCH packet
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.sendto(f'LAUNCH:{game_id}'.encode(), ('$PC_IP', $UDP_PORT))
+        
+        # Load groovy.rbf core
+        os.system('echo \"load_core $GROOVY_CORE\" > /dev/MiSTer_cmd 2>/dev/null')
+        sys.exit(0)
+    elif key in ['q', 'Q', '\x03']:
+        print('\nReturning to MiSTer Menu...')
+        os.system('echo \"load_core $MENU_CORE\" > /dev/MiSTer_cmd 2>/dev/null')
+        sys.exit(0)
+"
+
+# 4. Background Hotkey Monitor for In-Game Exit (Start + Coin)
+# When the user returns from groovy core, clean up PC emulator
+echo -n "KILL" | nc -u -w1 "$PC_IP" "$UDP_PORT" 2>/dev/null
+clear

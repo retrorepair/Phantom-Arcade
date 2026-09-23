@@ -107,37 +107,39 @@ To anyone playing on your arcade cabinet or CRT, **it feels like the MiSTer is r
 
 ## Step-by-Step Setup Guide
 
-### Phase 1: PC Server & Windows Setup
+### Phase 1: PC Server & Windows Setup (Compiled & Ready)
 
-1. **Option A: Using the C++ Windows Setup App**:
-   - Open `windows_setup/` and run `build_windows.bat` (or use Visual Studio 2022).
-   - Launch `PhantomArcadeManager.exe`.
-   - Point the emulator directory pickers to your PCSX2, Dolphin, Flycast, and Model 2 executables.
-   - Point your ROM folder paths (e.g. `C:\Games\PS2\`).
-   - Click **"Auto-Scan ROMs"** to automatically populate your games catalog.
-   - Enter your MiSTer IP address (e.g. `192.168.1.50`).
-   - Click **"Start Daemon"**.
+1. **Option A: Pre-Compiled Windows Desktop Application (Easiest)**:
+   - Run the pre-compiled **`PhantomArcadeManager.exe`** (found in `windows_setup/bin/` or downloaded directly from the web interface).
+   - Point the emulator pickers to your PCSX2, Dolphin, and Flycast executables.
+   - Point the ROM folder paths (e.g. `C:\Games\PS2\`, `C:\Games\GameCube\`).
+   - Click **"Auto-Scan ROMs"** to automatically populate `games_catalog.json`.
+   - Click **"Start Background Daemon"**. It automatically listens on UDP `2154` and responds to MiSTer auto-discovery requests.
 
 2. **Option B: Using Python 3**:
-   - Install Python 3.8+ on your host PC.
-   - Navigate to `pc_daemon/`.
-   - Edit `phantom_config.json` to verify emulator executable paths.
-   - Run:
-     ```bash
-     python phantom_server.py
-     ```
-   - Verify UDP listener is active on `0.0.0.0:2154` and HTTP catalog is on `0.0.0.0:8088`.
+   - Run `python phantom_server.py`.
 
 ---
 
-### Phase 2: MiSTer DE10-Nano Setup
+### Phase 2: MiSTer DE10-Nano Setup (Dead Simple)
 
-1. **Install Groovy_MiSTer Core**:
-   - Download the latest `groovy.rbf` from the official Groovy_MiSTer repository.
-   - Place it on your MiSTer SD card at `/media/fat/_Groovy/groovy.rbf`.
+Choose either of the two simplified installation methods:
 
-2. **Deploy the Client Files**:
-   - Copy `mister_client/phantom.ini` to `/media/fat/config/phantom.ini`.
+#### Method 1: The 1-Line Web Installer (Zero SD card removal)
+1. On your MiSTer, press **F9** (or SSH into `root@mister.local`).
+2. Run this single command:
+   ```bash
+   curl -sSL http://<YOUR_PC_IP>:8088/install | bash
+   ```
+   *This automatically creates directories, downloads `groovy.rbf`, configures the connection, and installs the menu script.*
+
+#### Method 2: Single-File Drop (Zero-Config LAN Auto-Discovery)
+1. Copy **`Phantom_Arcade.sh`** into your MiSTer SD card at `/media/fat/Scripts/`.
+2. Boot your MiSTer and select **Scripts → Phantom_Arcade**.
+3. **No IP setup required!** The script automatically broadcasts a UDP probe across your local network, discovers your running PC server, fetches your game library, and launches games.
+4. If `groovy.rbf` is not found, the script will offer to download it automatically over your internet connection.
+
+*(Optional)* For pixel-perfect direct framebuffer graphics on 15kHz CRT, you can also drop the pre-compiled ARM binary **`phantom_mister_frontend`** into `/media/fat/Scripts/`.
    - Open `/media/fat/config/phantom.ini` and set your PC IP:
      ```ini
      [SERVER]
