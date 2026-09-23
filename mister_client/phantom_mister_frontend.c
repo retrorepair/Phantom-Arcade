@@ -121,9 +121,9 @@ static const unsigned char font8x8[96][8] = {
 
 #define DEFAULT_PC_IP    "192.168.1.126"
 #define DEFAULT_UDP_PORT 1999
-#define GROOVY_CORE_PATH "/media/fat/_Utility/Groovy.rbf"
-#define PHANTOM_CORE_PATH "/media/fat/_Arcade/Phantom_Arcade.rbf"
-#define MENU_CORE_PATH   "/media/fat/menu.rbf"
+#define GROOVY_CORE_UTILITY "/media/fat/_Utility/Groovy.rbf"
+#define GROOVY_CORE_ARCADE  "/media/fat/_Arcade/Groovy.rbf"
+#define MENU_CORE_PATH      "/media/fat/menu.rbf"
 
 // Palette (32-bit ARGB / RGB888)
 #define COLOR_BG           0x0A0A0E // Deep arcade CRT black
@@ -453,11 +453,11 @@ int main(int argc, char *argv[]) {
                         // Launch game
                         send_udp_launch(games[selected].id);
 
-                        // Check which RBF core exists and switch to it
-                        if (access(PHANTOM_CORE_PATH, F_OK) == 0) {
-                            switch_fpga_core(PHANTOM_CORE_PATH);
+                        // Switch to Groovy.rbf (Core name must be 'Groovy' for is_groovy() network server hook)
+                        if (access(GROOVY_CORE_ARCADE, F_OK) == 0) {
+                            switch_fpga_core(GROOVY_CORE_ARCADE);
                         } else {
-                            switch_fpga_core(GROOVY_CORE_PATH);
+                            switch_fpga_core(GROOVY_CORE_UTILITY);
                         }
                         running = 0;
                         break;

@@ -90,11 +90,11 @@ export const ScriptExporter: React.FC = () => {
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-white">MiSTer_groovy</span>
                 <span className="text-[9px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30 px-1.5 py-0.5 rounded">
-                  ARM Binary
+                  ARM GLIBC 2.28
                 </span>
               </div>
               <p className="text-[11px] text-neutral-400 mt-1">
-                Official MiSTer Main (1.2 MB) compiled with Groovy hooks, UDP 1999 & SwitchRes.
+                Official tested Release 0.7 binary (947 KB). Compatible with MiSTer rootfs glibc 2.28.
               </p>
             </div>
             <a
@@ -111,22 +111,22 @@ export const ScriptExporter: React.FC = () => {
           <div className="bg-neutral-950 p-3.5 rounded-lg border border-neutral-800 flex flex-col justify-between gap-3 hover:border-amber-400/40 transition-colors">
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-white">Phantom_Arcade.rbf</span>
+                <span className="text-xs font-bold text-white">Groovy.rbf</span>
                 <span className="text-[9px] font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded">
                   FPGA Core
                 </span>
               </div>
               <p className="text-[11px] text-neutral-400 mt-1">
-                Zero-script analog GPU core (4.1 MB). Launch directly from Arcade or Utility menu!
+                Official FPGA core (4.1 MB). Must be named <code className="text-amber-300">Groovy.rbf</code> for core hooks.
               </p>
             </div>
             <a
-              href="/downloads/Phantom_Arcade.rbf"
-              download="Phantom_Arcade.rbf"
+              href="/downloads/Groovy.rbf"
+              download="Groovy.rbf"
               className="w-full py-1.5 px-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-100 font-bold text-[11px] rounded font-mono flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
               <Download className="w-3 h-3 text-amber-400" />
-              <span>Phantom_Arcade.rbf</span>
+              <span>Groovy.rbf</span>
             </a>
           </div>
 
@@ -134,13 +134,13 @@ export const ScriptExporter: React.FC = () => {
           <div className="bg-neutral-950 p-3.5 rounded-lg border border-neutral-800 flex flex-col justify-between gap-3 hover:border-amber-400/40 transition-colors">
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-white">Graphical Framebuffer</span>
+                <span className="text-xs font-bold text-white">Framebuffer GUI</span>
                 <span className="text-[9px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-1.5 py-0.5 rounded">
-                  /dev/fb0 GUI
+                  Static ARMv7
                 </span>
               </div>
               <p className="text-[11px] text-neutral-400 mt-1">
-                Pixel-perfect 15kHz CRT frontend with game wheel, arcade stick navigation & LED glow.
+                Statically linked CRT frontend (375 KB). 0 external dependencies, double-buffered /dev/fb0.
               </p>
             </div>
             <a
@@ -233,10 +233,10 @@ export const ScriptExporter: React.FC = () => {
               <span>Option A: Direct RBF Core Launch (Zero Scripts)</span>
             </h4>
             <ol className="text-[11px] text-neutral-300 space-y-1.5 list-decimal list-inside font-mono">
-              <li>Copy <code className="text-amber-300">MiSTer_groovy</code> to <code className="text-neutral-200">/media/fat/MiSTer_groovy</code></li>
-              <li>Copy <code className="text-amber-300">Phantom_Arcade.rbf</code> to <code className="text-neutral-200">/media/fat/_Arcade/</code></li>
+              <li>Copy <code className="text-amber-300">MiSTer_groovy</code> to <code className="text-neutral-200">/media/fat/MiSTer_groovy</code> (glibc 2.28 compatible)</li>
+              <li>Copy <code className="text-amber-300">Groovy.rbf</code> to <code className="text-neutral-200">/media/fat/_Utility/Groovy.rbf</code> or <code className="text-neutral-200">/media/fat/_Arcade/Groovy.rbf</code></li>
               <li>Add to <code className="text-neutral-200">/media/fat/MiSTer.ini</code>: <code className="text-amber-300">[Groovy] main=MiSTer_groovy</code></li>
-              <li>Launch <code className="text-neutral-200">Arcade -&gt; Phantom_Arcade</code> from the MiSTer OSD menu</li>
+              <li>Launch <code className="text-neutral-200">Utility -&gt; Groovy</code> from the MiSTer OSD menu</li>
             </ol>
           </div>
 
