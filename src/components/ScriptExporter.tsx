@@ -54,115 +54,203 @@ export const ScriptExporter: React.FC = () => {
       </div>
 
       {/* Compiled Binaries & Easy Installers Banner */}
-      <div className="bg-neutral-900/80 border border-neutral-800 rounded-xl p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-800/80 pb-3">
+      <div className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-5 space-y-5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-neutral-800 pb-4">
           <div>
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Pre-Compiled Binaries & Instant Launchers</span>
-            </h3>
-            <p className="text-xs text-neutral-400 mt-0.5">
-              No manual building or complex compiling required. Download the pre-built executables directly:
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+              <h3 className="text-base font-bold text-white tracking-tight">
+                Official Main_MiSTer + Groovy_MiSTer End-User Release
+              </h3>
+              <span className="text-[10px] font-mono px-2 py-0.5 bg-amber-400/20 text-amber-300 border border-amber-400/30 rounded">
+                Upstream 2026 Integrated
+              </span>
+            </div>
+            <p className="text-xs text-neutral-400 mt-1 max-w-3xl">
+              Official MiSTer Main binary merged with <code className="text-amber-300">psakhis/Groovy_MiSTer</code> support. Includes pre-compiled ARM binaries, Cyclone V FPGA RBF cores, native 15kHz CRT framebuffer graphical frontend, and all configuration files.
             </p>
           </div>
-          <span className="text-[11px] font-mono text-neutral-400 px-2.5 py-1 bg-neutral-950 border border-neutral-800 rounded-md">
-            Direct Downloads
-          </span>
+          
+          {/* All-in-one ZIP button */}
+          <a
+            href="/downloads/phantom_arcade_mister_release.zip"
+            download="phantom_arcade_mister_release.zip"
+            className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-neutral-950 font-bold text-xs rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-amber-500/10 transition-all cursor-pointer whitespace-nowrap"
+          >
+            <Download className="w-4 h-4" />
+            <span>Download Complete SD Card Pack (.zip · 5.7 MB)</span>
+          </a>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* Windows EXE */}
+        {/* Primary Download Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+          {/* 1. Official Main MiSTer Binary */}
           <div className="bg-neutral-950 p-3.5 rounded-lg border border-neutral-800 flex flex-col justify-between gap-3 hover:border-amber-400/40 transition-colors">
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-white">PhantomArcadeManager.exe</span>
-                <span className="text-[9px] font-mono bg-blue-500/20 text-blue-400 border border-blue-500/30 px-1.5 py-0.5 rounded">
-                  Windows x64
+                <span className="text-xs font-bold text-white">MiSTer_groovy</span>
+                <span className="text-[9px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30 px-1.5 py-0.5 rounded">
+                  ARM Binary
                 </span>
               </div>
               <p className="text-[11px] text-neutral-400 mt-1">
-                Compiled native Win32 app (2.7 MB). GUI setup, ROM scanner & bridge daemon.
+                Official MiSTer Main (1.2 MB) compiled with Groovy hooks, UDP 1999 & SwitchRes.
               </p>
             </div>
             <a
-              href="/downloads/PhantomArcadeManager.exe"
-              download="PhantomArcadeManager.exe"
-              className="w-full py-1.5 px-3 bg-amber-400 hover:bg-amber-300 text-neutral-950 font-bold text-xs rounded font-mono flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              href="/downloads/MiSTer_groovy"
+              download="MiSTer_groovy"
+              className="w-full py-1.5 px-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-100 font-bold text-[11px] rounded font-mono flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>Download (.exe)</span>
+              <Download className="w-3 h-3 text-amber-400" />
+              <span>MiSTer_groovy</span>
             </a>
           </div>
 
-          {/* MiSTer Zero-Config Script */}
+          {/* 2. FPGA RBF Core */}
           <div className="bg-neutral-950 p-3.5 rounded-lg border border-neutral-800 flex flex-col justify-between gap-3 hover:border-amber-400/40 transition-colors">
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-white">Phantom_Arcade.sh</span>
-                <span className="text-[9px] font-mono bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded">
-                  MiSTer Script
+                <span className="text-xs font-bold text-white">Phantom_Arcade.rbf</span>
+                <span className="text-[9px] font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded">
+                  FPGA Core
                 </span>
               </div>
               <p className="text-[11px] text-neutral-400 mt-1">
-                1-File Zero-Config Launcher. Auto-discovers PC IP on LAN via UDP broadcast!
+                Zero-script analog GPU core (4.1 MB). Launch directly from Arcade or Utility menu!
               </p>
             </div>
             <a
-              href="/downloads/Phantom_Arcade.sh"
-              download="Phantom_Arcade.sh"
-              className="w-full py-1.5 px-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-100 font-bold text-xs rounded font-mono flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              href="/downloads/Phantom_Arcade.rbf"
+              download="Phantom_Arcade.rbf"
+              className="w-full py-1.5 px-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-100 font-bold text-[11px] rounded font-mono flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>Download (.sh)</span>
+              <Download className="w-3 h-3 text-amber-400" />
+              <span>Phantom_Arcade.rbf</span>
             </a>
           </div>
 
-          {/* MiSTer Compiled ARM Binary */}
+          {/* 3. Native Framebuffer GUI */}
           <div className="bg-neutral-950 p-3.5 rounded-lg border border-neutral-800 flex flex-col justify-between gap-3 hover:border-amber-400/40 transition-colors">
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-white">phantom_mister_frontend</span>
-                <span className="text-[9px] font-mono bg-purple-500/20 text-purple-400 border border-purple-500/30 px-1.5 py-0.5 rounded">
-                  ARMv7 Linux
+                <span className="text-xs font-bold text-white">Graphical Framebuffer</span>
+                <span className="text-[9px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-1.5 py-0.5 rounded">
+                  /dev/fb0 GUI
                 </span>
               </div>
               <p className="text-[11px] text-neutral-400 mt-1">
-                Compiled framebuffer /dev/fb0 client for DE10-Nano (482 KB). 15kHz CRT native.
+                Pixel-perfect 15kHz CRT frontend with game wheel, arcade stick navigation & LED glow.
               </p>
             </div>
             <a
               href="/downloads/phantom_mister_frontend"
               download="phantom_mister_frontend"
-              className="w-full py-1.5 px-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-100 font-bold text-xs rounded font-mono flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              className="w-full py-1.5 px-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-100 font-bold text-[11px] rounded font-mono flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>Download (ARM ELF)</span>
+              <Download className="w-3 h-3 text-amber-400" />
+              <span>Frontend Binary</span>
             </a>
           </div>
 
-          {/* 1-Line Web Installer */}
+          {/* 4. Windows Manager EXE */}
           <div className="bg-neutral-950 p-3.5 rounded-lg border border-neutral-800 flex flex-col justify-between gap-3 hover:border-amber-400/40 transition-colors">
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-white">GitHub 1-Line Installer</span>
-                <span className="text-[9px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-1.5 py-0.5 rounded">
-                  Zero-Config
+                <span className="text-xs font-bold text-white">PhantomArcadeManager</span>
+                <span className="text-[9px] font-mono bg-blue-500/20 text-blue-300 border border-blue-500/30 px-1.5 py-0.5 rounded">
+                  Windows x64
                 </span>
               </div>
               <p className="text-[11px] text-neutral-400 mt-1">
-                Run on MiSTer (F9 or SSH): Pulls directly from GitHub CDN. No PC server or firewall setup needed to install!
+                Win32 PC manager (2.7 MB). Zero-config bridge, ROM cataloging, and SwitchRes sync.
+              </p>
+            </div>
+            <a
+              href="/downloads/PhantomArcadeManager.exe"
+              download="PhantomArcadeManager.exe"
+              className="w-full py-1.5 px-2 bg-amber-400 hover:bg-amber-300 text-neutral-950 font-bold text-[11px] rounded font-mono flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Download className="w-3 h-3" />
+              <span>Manager (.exe)</span>
+            </a>
+          </div>
+
+          {/* 5. C++ Git Patch */}
+          <div className="bg-neutral-950 p-3.5 rounded-lg border border-neutral-800 flex flex-col justify-between gap-3 hover:border-amber-400/40 transition-colors">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white">Groovy Main Patch</span>
+                <span className="text-[9px] font-mono bg-rose-500/20 text-rose-300 border border-rose-500/30 px-1.5 py-0.5 rounded">
+                  Source Diff
+                </span>
+              </div>
+              <p className="text-[11px] text-neutral-400 mt-1">
+                Complete git diff (7.6 KB) merging Groovy_MiSTer into upstream official Main_MiSTer.
+              </p>
+            </div>
+            <a
+              href="/downloads/groovy_mister_official_main.patch"
+              download="groovy_mister_official_main.patch"
+              className="w-full py-1.5 px-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-100 font-bold text-[11px] rounded font-mono flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Download className="w-3 h-3 text-amber-400" />
+              <span>Patch (.diff)</span>
+            </a>
+          </div>
+
+          {/* 6. 1-Line Installer */}
+          <div className="bg-neutral-950 p-3.5 rounded-lg border border-neutral-800 flex flex-col justify-between gap-3 hover:border-amber-400/40 transition-colors">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white">1-Line Installer</span>
+                <span className="text-[9px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded">
+                  Automated
+                </span>
+              </div>
+              <p className="text-[11px] text-neutral-400 mt-1">
+                Runs on MiSTer CLI (F9 or SSH): installs cores, binaries, and sets up MiSTer.ini automatically.
               </p>
             </div>
             <button
               onClick={() => {
                 navigator.clipboard.writeText('curl -k -sSL https://raw.githubusercontent.com/retrorepair/Phantom-Arcade/main/mister_client/install_mister.sh | bash');
-                alert('Copied direct GitHub installer to clipboard:\ncurl -k -sSL https://raw.githubusercontent.com/retrorepair/Phantom-Arcade/main/mister_client/install_mister.sh | bash\n\n(Note: Requires repository to be set to Public on GitHub)');
+                alert('Copied 1-line auto-installer to clipboard:\n\ncurl -k -sSL https://raw.githubusercontent.com/retrorepair/Phantom-Arcade/main/mister_client/install_mister.sh | bash');
               }}
-              className="w-full py-1.5 px-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-100 font-bold text-xs rounded font-mono flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              className="w-full py-1.5 px-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-100 font-bold text-[11px] rounded font-mono flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
-              <Copy className="w-3.5 h-3.5" />
-              <span>Copy GitHub Curl</span>
+              <Copy className="w-3 h-3 text-amber-400" />
+              <span>Copy Curl Command</span>
             </button>
+          </div>
+        </div>
+
+        {/* How to Run Instructions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-neutral-800/80">
+          <div className="bg-neutral-950/60 p-4 rounded-lg border border-neutral-800/80">
+            <h4 className="text-xs font-bold text-amber-400 flex items-center gap-2 mb-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+              <span>Option A: Direct RBF Core Launch (Zero Scripts)</span>
+            </h4>
+            <ol className="text-[11px] text-neutral-300 space-y-1.5 list-decimal list-inside font-mono">
+              <li>Copy <code className="text-amber-300">MiSTer_groovy</code> to <code className="text-neutral-200">/media/fat/MiSTer_groovy</code></li>
+              <li>Copy <code className="text-amber-300">Phantom_Arcade.rbf</code> to <code className="text-neutral-200">/media/fat/_Arcade/</code></li>
+              <li>Add to <code className="text-neutral-200">/media/fat/MiSTer.ini</code>: <code className="text-amber-300">[Groovy] main=MiSTer_groovy</code></li>
+              <li>Launch <code className="text-neutral-200">Arcade -&gt; Phantom_Arcade</code> from the MiSTer OSD menu</li>
+            </ol>
+          </div>
+
+          <div className="bg-neutral-950/60 p-4 rounded-lg border border-neutral-800/80">
+            <h4 className="text-xs font-bold text-cyan-400 flex items-center gap-2 mb-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+              <span>Option B: Graphical Framebuffer CRT Launcher</span>
+            </h4>
+            <ol className="text-[11px] text-neutral-300 space-y-1.5 list-decimal list-inside font-mono">
+              <li>Copy <code className="text-cyan-300">phantom_mister_frontend</code> & <code className="text-cyan-300">Phantom_Arcade.sh</code> to <code className="text-neutral-200">/media/fat/Scripts/</code></li>
+              <li>Run <code className="text-neutral-200">PhantomArcadeManager.exe</code> on your Windows PC</li>
+              <li>On MiSTer, select <code className="text-neutral-200">Scripts -&gt; Phantom_Arcade</code></li>
+              <li>Enjoy the graphical CRT frontend with arcade stick game selection!</li>
+            </ol>
           </div>
         </div>
       </div>

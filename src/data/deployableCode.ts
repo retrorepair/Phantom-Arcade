@@ -649,6 +649,52 @@ chmod +x /media/fat/Scripts/Phantom_Arcade.sh
 echo "[✓] Phantom Arcade installed! Launch it from MiSTer Main Menu -> Scripts."`
   },
   {
+    filename: 'MiSTer.ini',
+    targetPlatform: 'System Config',
+    destinationPath: '/media/fat/MiSTer.ini',
+    description: 'MiSTer FPGA configuration snippet directing the [Groovy] core section to execute MiSTer_groovy with optimal 15.7kHz analog CRT sync timings.',
+    language: 'ini',
+    code: `; ==============================================================================
+; MiSTer.ini — Groovy_MiSTer / Phantom Arcade Configuration
+; Place or merge this into /media/fat/MiSTer.ini
+; ==============================================================================
+
+[Groovy]
+main=MiSTer_groovy
+vga_scaler=0
+composite_sync=1
+ypbpr=0
+direct_video=0`
+  },
+  {
+    filename: 'groovy_mister_official_main.patch',
+    targetPlatform: 'MiSTer FPGA (Linux ARM)',
+    destinationPath: 'mister_release/groovy_mister_official_main.patch',
+    description: 'Git diff patch merging psakhis/Groovy_MiSTer into the latest official MiSTer-devel/Main_MiSTer upstream codebase.',
+    language: 'cpp',
+    code: `// Git diff patch summary against official MiSTer-devel/Main_MiSTer:
+// - Added support/groovy/ submodule (groovy.cpp, groovy.h, groovy_cmd.h, switchres)
+// - Added shmem_map_private() in shmem.cpp for high-speed shared memory framebuffers
+// - Integrated is_groovy() input hooks in user_io.cpp:
+//     * Digital joystick & arcade stick routing
+//     * Analog stick axes (LX, LY, RX, RY)
+//     * PS/2 keyboard scancodes
+//     * Optical mouse & trackball delta polling
+// - Integrated groovy_stop() in fpga_io.cpp on core teardown
+// - Integrated GMC file autoload in menu.cpp
+// Compiled with arm-linux-gnueabihf-g++ into MiSTer_groovy and MiSTer_groovy_XDP.`
+  },
+  {
+    filename: 'phantom_mister_frontend.c',
+    targetPlatform: 'MiSTer FPGA (Linux ARM)',
+    destinationPath: '/media/fat/Scripts/phantom_mister_frontend (compiled ARM binary)',
+    description: 'Direct Linux framebuffer (/dev/fb0) CRT launcher rendering the full graphical arcade UI with bitmap font, categories, scanline layout, and arcade stick controls.',
+    language: 'c',
+    code: `// See /mister_client/phantom_mister_frontend.c for the complete source code
+// Features embedded 8x8 font, direct /dev/fb0 drawing, double-buffering,
+// /dev/input/event* arcade stick navigation, and zero-latency core switching.`
+  },
+  {
     filename: 'README.md',
     targetPlatform: 'Documentation',
     destinationPath: 'README.md',

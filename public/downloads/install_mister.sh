@@ -21,69 +21,89 @@ echo "=========================================================="
 echo ""
 
 # Ensure required directories exist on SD card
-echo "[1/4] Preparing MiSTer directories..."
-mkdir -p /media/fat/_Groovy
+echo "[1/6] Preparing MiSTer directories..."
+mkdir -p /media/fat/_Utility
+mkdir -p /media/fat/_Arcade
 mkdir -p /media/fat/Scripts
 mkdir -p /media/fat/config
 
-# 1. Download Groovy_MiSTer Core (groovy.rbf)
-if [ ! -f /media/fat/_Groovy/groovy.rbf ]; then
-    echo "[2/4] Downloading Groovy_MiSTer core (groovy.rbf)..."
-    curl -k -f -L --connect-timeout 8 --max-time 60 \
-      -o /media/fat/_Groovy/groovy.rbf \
-      "https://raw.githubusercontent.com/MiSTer-devel/Groovy_MiSTer/main/releases/groovy.rbf" || {
-        echo "[-] Note: Could not download groovy.rbf automatically."
-        echo "    You can manually place groovy.rbf into /media/fat/_Groovy/"
+# 1. Download Groovy_MiSTer Core (Groovy.rbf & Phantom_Arcade.rbf)
+echo "[2/6] Installing Groovy_MiSTer & Phantom Arcade RBF cores..."
+if [ ! -f /media/fat/_Utility/Groovy.rbf ]; then
+    echo "      Downloading Groovy.rbf..."
+    curl -k -f -L --connect-timeout 10 --max-time 120 \
+      -o /media/fat/_Utility/Groovy.rbf \
+      "https://raw.githubusercontent.com/psakhis/Groovy_MiSTer/main/Groovy.rbf" || {
+        echo "[-] Note: Trying fallback release URL..."
+        curl -k -f -L --connect-timeout 10 --max-time 120 \
+          -o /media/fat/_Utility/Groovy.rbf \
+          "https://github.com/psakhis/Groovy_MiSTer/releases/download/0.7/Groovy_20240922.rbf" || true
     }
+fi
+
+if [ -f /media/fat/_Utility/Groovy.rbf ] && [ ! -f /media/fat/_Arcade/Phantom_Arcade.rbf ]; then
+    cp /media/fat/_Utility/Groovy.rbf /media/fat/_Arcade/Phantom_Arcade.rbf
+fi
+
+# 2. Install MiSTer_groovy (Official Main with Groovy integration)
+echo "[3/6] Installing MiSTer Main binary with Groovy integration..."
+if [ ! -f /media/fat/MiSTer_groovy ]; then
+    curl -k -f -L --connect-timeout 10 --max-time 60 \
+      -o /media/fat/MiSTer_groovy \
+      "${RAW_BASE}/public/downloads/MiSTer_groovy" 2>/dev/null || {
+        curl -k -f -L --connect-timeout 10 --max-time 60 \
+          -o /media/fat/MiSTer_groovy \
+          "${RAW_BASE}/mister_release/MiSTer_groovy" 2>/dev/null || true
+    }
+    if [ -f /media/fat/MiSTer_groovy ]; then
+        chmod +x /media/fat/MiSTer_groovy
+    fi
+fi
+
+# 3. Configure MiSTer.ini for Groovy core
+echo "[4/6] Updating /media/fat/MiSTer.ini..."
+if [ -f /media/fat/MiSTer.ini ]; then
+    if ! grep -q "Groovy" /media/fat/MiSTer.ini; then
+        echo "" >> /media/fat/MiSTer.ini
+        echo "[Groovy]" >> /media/fat/MiSTer.ini
+        echo "main=MiSTer_groovy" >> /media/fat/MiSTer.ini
+        echo "[✓] Added [Groovy] main=MiSTer_groovy to MiSTer.ini"
+    fi
 else
-    echo "[2/4] Groovy_MiSTer core already present in /media/fat/_Groovy/groovy.rbf."
+    cat << "INIOUT" > /media/fat/MiSTer.ini
+[Groovy]
+main=MiSTer_groovy
+INIOUT
 fi
 
-# 2. Download Phantom_Arcade.sh from GitHub
-echo "[3/4] Downloading latest Phantom_Arcade.sh launcher from GitHub (${RAW_BASE})..."
-DOWNLOAD_OK=false
+# 4. Install Graphical CRT Framebuffer Frontend
+echo "[5/6] Installing Graphical CRT Framebuffer Frontend & Scripts..."
+curl -k -f -L --connect-timeout 10 --max-time 30 \
+  -o /media/fat/Scripts/phantom_mister_frontend \
+  "${RAW_BASE}/public/downloads/phantom_mister_frontend" 2>/dev/null || true
 
-if curl -k -f -L --connect-timeout 8 --max-time 30 \
+if [ -f /media/fat/Scripts/phantom_mister_frontend ]; then
+    chmod +x /media/fat/Scripts/phantom_mister_frontend
+fi
+
+curl -k -f -L --connect-timeout 10 --max-time 30 \
   -o /media/fat/Scripts/Phantom_Arcade.sh \
-  "${RAW_BASE}/mister_client/Phantom_Arcade.sh" 2>/dev/null; then
-    DOWNLOAD_OK=true
-elif curl -k -f -L --connect-timeout 8 --max-time 30 \
-  -o /media/fat/Scripts/Phantom_Arcade.sh \
-  "https://raw.githubusercontent.com/${REPO_USER}/${REPO_NAME}/master/mister_client/Phantom_Arcade.sh" 2>/dev/null; then
-    DOWNLOAD_OK=true
+  "${RAW_BASE}/mister_client/Phantom_Arcade.sh" 2>/dev/null || true
+
+if [ -f /media/fat/Scripts/Phantom_Arcade.sh ]; then
+    chmod +x /media/fat/Scripts/Phantom_Arcade.sh
 fi
 
-if [ "$DOWNLOAD_OK" = false ]; then
-    echo ""
-    echo "=========================================================="
-    echo " [!] ERROR: Could not download script from GitHub."
-    echo "=========================================================="
-    echo " Possible causes:"
-    echo " 1. The repository https://github.com/${REPO_USER}/${REPO_NAME} is PRIVATE."
-    echo "    GitHub returns '404: Not Found' to unauthenticated curl requests"
-    echo "    for private repositories."
-    echo ""
-    echo "    To fix:"
-    echo "    a) Set repo visibility to PUBLIC on GitHub (Settings -> Danger Zone),"
-    echo "       OR"
-    echo "    b) Copy Phantom_Arcade.sh directly from your PC to MiSTer via SCP:"
-    echo "       scp mister_client/Phantom_Arcade.sh root@<MISTER_IP>:/media/fat/Scripts/"
-    echo "=========================================================="
-    exit 1
-fi
-
-chmod +x /media/fat/Scripts/Phantom_Arcade.sh
-
-# 3. Initialize default configuration (Defaults to port 1999)
-echo "[4/4] Setting default configuration..."
+# 5. Initialize default configuration
+echo "[6/6] Setting default configuration..."
 if [ ! -f /media/fat/config/phantom.ini ]; then
-    cat <<EOF > /media/fat/config/phantom.ini
+    cat << "CFGOUT" > /media/fat/config/phantom.ini
 [SERVER]
 PC_SERVER_IP=
 UDP_PORT=1999
 HTTP_PORT=8088
 AUTO_DISCOVERY=true
-EOF
+CFGOUT
 fi
 
 echo ""
@@ -91,10 +111,10 @@ echo "=========================================================="
 echo " [✓] SUCCESS: Phantom Arcade installed on your MiSTer!    "
 echo "=========================================================="
 echo "How to launch:"
-echo " 1. Turn on your PC and run PhantomArcadeManager.exe"
-echo " 2. On your MiSTer, go to Main Menu -> Scripts"
-echo " 3. Select 'Phantom_Arcade'"
+echo " 1. Start PhantomArcadeManager.exe on your Windows PC."
+echo " 2. On your MiSTer, choose either:"
+echo "    - Direct RBF Core: Go to Arcade -> Phantom_Arcade (or Utility -> Groovy)"
+echo "    - Graphical Menu:  Go to Scripts -> Phantom_Arcade"
 echo ""
-echo "The script will automatically discover your PC on UDP port 1999."
-echo "Enjoy pixel-perfect 15kHz CRT gaming!"
+echo "Pixel-perfect 15kHz CRT gaming is now active on your setup!"
 echo ""

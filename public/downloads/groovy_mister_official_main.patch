@@ -1,0 +1,254 @@
+diff --git a/fpga_io.cpp b/fpga_io.cpp
+index b64cfe5..cba7166 100644
+--- a/fpga_io.cpp
++++ b/fpga_io.cpp
+@@ -15,6 +15,8 @@
+ #include "osd.h"
+ #include "menu.h"
+ #include "shmem.h"
++#include "support.h"
++#include "user_io.h"
+ #include "offload.h"
+ 
+ #include "fpga_base_addr_ac5.h"
+@@ -425,6 +427,10 @@ static int make_env(const char *name, const char *cfg)
+ 
+ int fpga_load_rbf(const char *name, const char *cfg, const char *xml)
+ {
++	if (is_groovy()) //clean server
++	{
++		groovy_stop();
++	}
+ 	OsdDisable();
+ 	static char path[1024];
+ 	int ret = 0;
+diff --git a/scaler.cpp b/scaler.cpp
+index faeed0f..df63160 100644
+--- a/scaler.cpp
++++ b/scaler.cpp
+@@ -230,21 +230,21 @@ int mister_scaler_read(mister_scaler *ms, unsigned char *gbuf, mister_scaler_for
+         switch (format)
+         {
+             case RGB:
+-                for (int x = limit; x < ms->width; x++) {
++                for (int x = 0; x < ms->width; x++) {
+                     outbuf[x * 3 + 0] = pixbuf[x * 3 + 0];
+                     outbuf[x * 3 + 1] = pixbuf[x * 3 + 1];
+                     outbuf[x * 3 + 2] = pixbuf[x * 3 + 2];
+                 }
+                 break;
+             case BGR:
+-                for (int x = limit; x < ms->width; x++) {
++                for (int x = 0; x < ms->width; x++) {
+                     outbuf[x * 3 + 2] = pixbuf[x * 3 + 0];
+                     outbuf[x * 3 + 1] = pixbuf[x * 3 + 1];
+                     outbuf[x * 3 + 0] = pixbuf[x * 3 + 2];
+                 }
+                 break;
+             case RGBA:
+-                for (int x = limit; x < ms->width; x++) {
++                for (int x = 0; x < ms->width; x++) {
+                     outbuf[x * 4 + 0] = pixbuf[x * 3 + 0];
+                     outbuf[x * 4 + 1] = pixbuf[x * 3 + 1];
+                     outbuf[x * 4 + 2] = pixbuf[x * 3 + 2];
+@@ -252,7 +252,7 @@ int mister_scaler_read(mister_scaler *ms, unsigned char *gbuf, mister_scaler_for
+                 }
+                 break;
+             case BGRA:
+-                for (int x = limit; x < ms->width; x++) {
++                for (int x = 0; x < ms->width; x++) {
+                     outbuf[x * 4 + 2] = pixbuf[x * 3 + 0];
+                     outbuf[x * 4 + 1] = pixbuf[x * 3 + 1];
+                     outbuf[x * 4 + 0] = pixbuf[x * 3 + 2];
+@@ -260,7 +260,7 @@ int mister_scaler_read(mister_scaler *ms, unsigned char *gbuf, mister_scaler_for
+                 }
+                 break;
+             case ARGB32:
+-                for (int x = limit; x < ms->width; x++) {
++                for (int x = 0; x < ms->width; x++) {
+                 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+                     outbuf[x * 4 + 0] = pixbuf[x * 3 + 2]; // B
+                     outbuf[x * 4 + 1] = pixbuf[x * 3 + 1]; // G
+@@ -286,7 +286,7 @@ int mister_scaler_read(mister_scaler *ms, unsigned char *gbuf, mister_scaler_for
+ #else
+ 
+ // no NEON available, do all scalar
+-int mister_scaler_read(mister_scaler *ms, unsigned char *gbuf, mister_scaler_format_t format = RGB)
++int mister_scaler_read(mister_scaler *ms, unsigned char *gbuf, mister_scaler_format_t format)
+ {
+     #ifdef PROFILING
+         PROFILE_FUNCTION();
+@@ -337,7 +337,7 @@ int mister_scaler_read(mister_scaler *ms, unsigned char *gbuf, mister_scaler_for
+                 }
+                 break;
+             case ARGB32:
+-            for (int x = limit; x < ms->width; x++) {
++            for (int x = 0; x < ms->width; x++) {
+             #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+                 outbuf[x * 4 + 0] = pixbuf[x * 3 + 2]; // B
+                 outbuf[x * 4 + 1] = pixbuf[x * 3 + 1]; // G
+diff --git a/shmem.cpp b/shmem.cpp
+index ec6acaa..22ec61d 100644
+--- a/shmem.cpp
++++ b/shmem.cpp
+@@ -37,6 +37,31 @@ void *shmem_map(uint32_t address, uint32_t size)
+ 	return res;
+ }
+ 
++
++
++
++void *shmem_map_private(uint32_t address, uint32_t size)
++{
++	if (memfd < 0)
++	{
++		memfd = open("/dev/mem", O_RDWR | O_SYNC | O_CLOEXEC);
++		if (memfd == -1)
++		{
++			printf("Error: Unable to open /dev/mem!\n");
++			return 0;
++		}
++	}
++
++	void *res = mmap(0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, memfd, address);
++	if (res == (void *)-1)
++	{
++		printf("Error: Unable to mmap private (0x%X, %d)!\n", address, size);
++		return 0;
++	}
++
++	return res;
++}
++
+ int shmem_unmap(void* map, uint32_t size)
+ {
+ 	if (munmap(map, size) < 0)
+diff --git a/shmem.h b/shmem.h
+index 865bc1b..3f91e9a 100644
+--- a/shmem.h
++++ b/shmem.h
+@@ -5,6 +5,7 @@
+ #define SHMEM_H
+ 
+ void *shmem_map(uint32_t address, uint32_t size);
++void *shmem_map_private(uint32_t address, uint32_t size);
+ int shmem_unmap(void* map, uint32_t size);
+ int shmem_put(uint32_t address, uint32_t size, void *buf);
+ int shmem_get(uint32_t address, uint32_t size, void *buf);
+diff --git a/support.h b/support.h
+index c47056b..867887b 100644
+--- a/support.h
++++ b/support.h
+@@ -75,3 +75,6 @@
+ 
+ // 3DO  support
+ #include "support/3do/3do.h"
++
++// Groovy support
++#include "support/groovy/groovy.h"
+diff --git a/user_io.cpp b/user_io.cpp
+index d7a71a7..fddec26 100644
+--- a/user_io.cpp
++++ b/user_io.cpp
+@@ -429,6 +429,13 @@ char is_n64()
+ 	return (is_n64_type == 1);
+ }
+ 
++static int is_groovy_type = 0;
++char is_groovy()
++{
++	if (!is_groovy_type) is_groovy_type = strcasecmp(orig_name, "Groovy") ? 2 : 1;
++	return (is_groovy_type == 1);
++}
++
+ static int is_uneon_type = 0;
+ char is_uneon()
+ {
+@@ -481,6 +488,7 @@ void user_io_read_core_name()
+ 	is_saturn_type = 0;
+ 	is_n64_type = 0;
+ 	is_uneon_type = 0;
++	is_groovy_type = 0;
+ 	core_name[0] = 0;
+ 
+ 	char *p = user_io_get_confstr(0);
+@@ -1827,6 +1835,11 @@ void user_io_l_analog_joystick(unsigned char joystick, char valueX, char valueY)
+ 		}
+ 		DisableIO();
+ 	}
++
++	if (is_groovy())
++	{
++		groovy_send_analog(joystick, 0, valueX, valueY);
++	}
+ }
+ 
+ void user_io_r_analog_joystick(unsigned char joystick, char valueX, char valueY)
+@@ -1844,6 +1857,11 @@ void user_io_r_analog_joystick(unsigned char joystick, char valueX, char valueY)
+ 		}
+ 		DisableIO();
+ 	}
++
++	if (is_groovy())
++	{
++		groovy_send_analog(joystick, 1, valueX, valueY);
++	}
+ }
+ 
+ void user_io_digital_joystick(unsigned char joystick, uint32_t map, int newdir)
+@@ -1858,6 +1876,11 @@ void user_io_digital_joystick(unsigned char joystick, uint32_t map, int newdir)
+ 	if(use32) spi_w(map >> 16);
+ 	DisableIO();
+ 
++	if (is_groovy())
++	{
++		groovy_send_joystick(joystick, map);
++	}
++
+ 	if (!is_minimig() && joy_transl == 1 && newdir)
+ 	{
+ 		user_io_l_analog_joystick(joystick, (map & 2) ? 128 : (map & 1) ? 127 : 0, (map & 8) ? 128 : (map & 4) ? 127 : 0);
+@@ -3953,6 +3976,7 @@ void user_io_poll()
+ 	if (is_psx()) psx_poll();
+ 	if (is_neogeo_cd()) neocd_poll();
+ 	if (is_n64()) n64_poll();
++	if (is_groovy()) groovy_poll();
+ 	if (is_c64() || is_c128())
+ 	{
+ 		uint16_t save_req = spi_uio_cmd(UIO_CHK_UPLOAD);
+@@ -4106,6 +4130,11 @@ static void send_keycode(unsigned short key, int press)
+ 
+ 	if (core_type == CORE_TYPE_8BIT)
+ 	{
++		if (is_groovy())
++		{
++			groovy_send_keyboard(key, press);
++		}
++
+ 		uint32_t code = get_ps2_code(key);
+ 		if (code == NONE) return;
+ 
+@@ -4296,6 +4325,11 @@ void user_io_mouse(unsigned char b, int16_t x, int16_t y, int16_t w)
+ 				spi_w(ps2_mouse[1] | ((((uint16_t)b) << 5) & 0xF00));
+ 				spi_w(ps2_mouse[2] | ((((uint16_t)b) << 1) & 0x100));
+ 				DisableIO();
++
++				if (is_groovy())
++				{
++					groovy_send_mouse(ps2_mouse[0], ps2_mouse[1], ps2_mouse[2], (unsigned char) w);
++				}
+ 			}
+ 		}
+ 		return;
+diff --git a/user_io.h b/user_io.h
+index b616c50..e2e3bf3 100644
+--- a/user_io.h
++++ b/user_io.h
+@@ -297,6 +297,7 @@ char is_saturn();
+ char is_pcxt();
+ char is_n64();
+ char is_uneon();
++char is_groovy();
+ char is_atari800();
+ char is_atari5200();
+ char is_3do();
