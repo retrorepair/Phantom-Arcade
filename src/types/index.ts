@@ -1,4 +1,4 @@
-export type ConsoleSystem = 'ps2' | 'gamecube' | 'wii' | 'naomi' | 'model2' | 'saturn';
+export type ConsoleSystem = 'mame' | 'ps2' | 'gamecube' | 'wii' | 'naomi' | 'model2' | 'saturn';
 
 export interface GameItem {
   id: string;
@@ -25,7 +25,7 @@ export interface EmulatorProfile {
   executableName: string;
   defaultExecutablePath: string;
   commandTemplate: string; // e.g. "{exe} -batch -fullscreen -elf \"{rom}\""
-  videoPipeline: 'Groovy_MiSTer D3D9' | 'Groovy_MiSTer Vulkan' | 'SwitchRes Direct' | 'Raw Framebuffer UDP';
+  videoPipeline: 'Groovy_MiSTer D3D9' | 'Groovy_MiSTer Vulkan' | 'SwitchRes Direct' | 'Raw Framebuffer UDP' | 'Groovy_MiSTer SwitchRes 15kHz Direct' | 'Experimental Video Bridge';
   killMethod: 'taskkill' | 'SIGTERM' | 'SIGKILL' | 'graceful_window';
   notes: string;
 }

@@ -33,6 +33,7 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
   const [newGenre, setNewGenre] = useState('Fighting (2D)');
 
   const systemNames: Record<ConsoleSystem, string> = {
+    mame: 'GroovyMAME Arcade (15kHz)',
     ps2: 'Sony PlayStation 2',
     gamecube: 'Nintendo GameCube',
     wii: 'Nintendo Wii',
@@ -171,6 +172,7 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
                 className="bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-300 focus:outline-none focus:border-amber-400"
               >
                 <option value="all">All Systems</option>
+                <option value="mame">GroovyMAME Arcade</option>
                 <option value="ps2">PlayStation 2</option>
                 <option value="gamecube">GameCube</option>
                 <option value="wii">Wii</option>
@@ -368,7 +370,8 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
                     onChange={(e) => {
                       const sys = e.target.value as ConsoleSystem;
                       setNewSystem(sys);
-                      if (sys === 'ps2') setNewRomPath('C:\\Games\\PS2\\');
+                      if (sys === 'mame') setNewRomPath('C:\\Emulators\\GroovyMAME\\roms\\');
+                      else if (sys === 'ps2') setNewRomPath('C:\\Games\\PS2\\');
                       else if (sys === 'gamecube') setNewRomPath('C:\\Games\\GameCube\\');
                       else if (sys === 'wii') setNewRomPath('C:\\Games\\Wii\\');
                       else if (sys === 'naomi') setNewRomPath('C:\\Games\\Arcade\\Naomi\\');
@@ -376,6 +379,7 @@ export const LibraryManager: React.FC<LibraryManagerProps> = ({
                     }}
                     className="w-full bg-neutral-950 border border-neutral-800 rounded px-3 py-2 text-white focus:outline-none focus:border-amber-400"
                   >
+                    <option value="mame">GroovyMAME Arcade (15kHz)</option>
                     <option value="ps2">Sony PlayStation 2</option>
                     <option value="gamecube">Nintendo GameCube</option>
                     <option value="wii">Nintendo Wii</option>

@@ -2,15 +2,15 @@ import { EmulatorProfile, GameItem, ModelinePreset } from '../types';
 
 export const DEFAULT_EMULATORS: EmulatorProfile[] = [
   {
-    id: 'pcsx2',
-    name: 'PCSX2 (Nightly / Groovy Build)',
-    system: 'ps2',
-    executableName: 'pcsx2-qt.exe',
-    defaultExecutablePath: 'C:\\Emulators\\PCSX2\\pcsx2-qt.exe',
-    commandTemplate: '{exe} -batch -fullscreen -elf "{rom}"',
-    videoPipeline: 'Groovy_MiSTer D3D9',
+    id: 'groovymame',
+    name: 'GroovyMAME (Official Calamity Build)',
+    system: 'mame',
+    executableName: 'groovymame64.exe',
+    defaultExecutablePath: 'C:\\Emulators\\GroovyMAME\\groovymame64.exe',
+    commandTemplate: '{exe} -video mister -mister_ip {mister_ip} -mister_port {mister_port} {rom_stem}',
+    videoPipeline: 'Groovy_MiSTer SwitchRes 15kHz Direct',
     killMethod: 'taskkill',
-    notes: 'Configured with Groovy_MiSTer raw video hook. Renders native 15kHz 240p/480i frame buffers directly over LAN to MiSTer groovy.rbf.'
+    notes: 'Direct native Groovy_MiSTer network streaming. Dynamically switches pixel-accurate arcade modelines on your CRT (CPS1/2/3, NeoGeo, Cave, Midway).'
   },
   {
     id: 'dolphin',
@@ -24,17 +24,6 @@ export const DEFAULT_EMULATORS: EmulatorProfile[] = [
     notes: 'Runs GameCube and arcade Triforce games natively in 240p or 480i without scaling artifacts.'
   },
   {
-    id: 'dolphin_wii',
-    name: 'Dolphin (Wii Mode)',
-    system: 'wii',
-    executableName: 'Dolphin.exe',
-    defaultExecutablePath: 'C:\\Emulators\\Dolphin\\Dolphin.exe',
-    commandTemplate: '{exe} -b -e "{rom}"',
-    videoPipeline: 'Groovy_MiSTer Vulkan',
-    killMethod: 'graceful_window',
-    notes: 'Perfect for 240p fighting games like Tatsunoko vs Capcom or Castlevania Judgment.'
-  },
-  {
     id: 'flycast',
     name: 'Flycast (Sega Naomi & Atomiswave)',
     system: 'naomi',
@@ -46,6 +35,28 @@ export const DEFAULT_EMULATORS: EmulatorProfile[] = [
     notes: 'Supports 15kHz (standard resolution) and 31kHz (VGA) arcade modes.'
   },
   {
+    id: 'pcsx2',
+    name: 'PCSX2 (Custom Pipeline)',
+    system: 'ps2',
+    executableName: 'pcsx2-qt.exe',
+    defaultExecutablePath: 'C:\\Emulators\\PCSX2\\pcsx2-qt.exe',
+    commandTemplate: '{exe} -batch -fullscreen -elf "{rom}"',
+    videoPipeline: 'Experimental Video Bridge',
+    killMethod: 'taskkill',
+    notes: 'Experimental wrapper. (PCSX2 lacks direct native Groovy_MiSTer streaming output out-of-the-box).'
+  },
+  {
+    id: 'dolphin_wii',
+    name: 'Dolphin (Wii Mode)',
+    system: 'wii',
+    executableName: 'Dolphin.exe',
+    defaultExecutablePath: 'C:\\Emulators\\Dolphin\\Dolphin.exe',
+    commandTemplate: '{exe} -b -e "{rom}"',
+    videoPipeline: 'Groovy_MiSTer Vulkan',
+    killMethod: 'graceful_window',
+    notes: 'Perfect for 240p fighting games like Tatsunoko vs Capcom or Castlevania Judgment.'
+  },
+  {
     id: 'model2emu',
     name: 'Nebula Model 2 Emulator',
     system: 'model2',
@@ -55,52 +66,57 @@ export const DEFAULT_EMULATORS: EmulatorProfile[] = [
     videoPipeline: 'Groovy_MiSTer D3D9',
     killMethod: 'taskkill',
     notes: 'Outputs native 496x384 24kHz medium-res or 15kHz downscaled for arcade CRTs.'
-  },
-  {
-    id: 'mednafen_saturn',
-    name: 'Mednafen / SSF Saturn CRT',
-    system: 'saturn',
-    executableName: 'mednafen.exe',
-    defaultExecutablePath: 'C:\\Emulators\\Mednafen\\mednafen.exe',
-    commandTemplate: '{exe} "{rom}"',
-    videoPipeline: 'SwitchRes Direct',
-    killMethod: 'SIGTERM',
-    notes: 'Exact 320x224 and 704x224 hi-res interlaced mode switching.'
   }
 ];
 
 export const INITIAL_GAMES: GameItem[] = [
   {
-    id: 'ps2_arcana_heart',
-    title: 'Arcana Heart',
-    system: 'ps2',
-    systemName: 'Sony PlayStation 2',
-    romName: 'ArcanaHeart.iso',
-    romPath: 'C:\\Games\\PS2\\ArcanaHeart.iso',
-    emulatorId: 'pcsx2',
-    videoMode: '15kHz 240p @ 60Hz',
-    resolution: '640x224',
-    modeline: '"640x224_60" 12.80 640 664 728 800 224 236 239 262 -hsync -vsync',
-    description: 'High-speed 2D anime fighting game developed by Examu. Demands instantaneous stick input and scanline-accurate CRT rendering.',
-    year: 2006,
+    id: 'mame_sf2ce',
+    title: "Street Fighter II' - Champion Edition",
+    system: 'mame',
+    systemName: 'GroovyMAME (CPS-1)',
+    romName: 'sf2ce.zip',
+    romPath: 'C:\\Emulators\\GroovyMAME\\roms\\sf2ce.zip',
+    emulatorId: 'groovymame',
+    videoMode: '15kHz 224p @ 59.63Hz',
+    resolution: '384x224',
+    modeline: '"384x224_59.63" 7.37 384 400 432 488 224 233 236 253 -hsync -vsync',
+    description: 'The arcade fighting masterpiece running with native GroovyMAME Groovy_MiSTer streaming over UDP:1999 with 0 added frames of latency.',
+    year: 1992,
     genre: 'Fighting (2D)',
-    bannerColor: 'from-pink-950/80 to-rose-900/40'
+    bannerColor: 'from-amber-950/80 to-yellow-900/40'
   },
   {
-    id: 'ps2_cvs2',
-    title: 'Capcom vs. SNK 2: Mark of the Millennium',
-    system: 'ps2',
-    systemName: 'Sony PlayStation 2',
-    romName: 'CapcomVsSNK2.iso',
-    romPath: 'C:\\Games\\PS2\\CapcomVsSNK2.iso',
-    emulatorId: 'pcsx2',
-    videoMode: '15kHz 240p @ 59.94Hz',
-    resolution: '640x224',
-    modeline: '"640x224_60" 12.80 640 664 728 800 224 236 239 262 -hsync -vsync',
-    description: 'The pinnacle of crossover 2D fighting games featuring the Groove system and competitive arcade mechanics.',
-    year: 2001,
+    id: 'mame_mslug',
+    title: 'Metal Slug - Super Vehicle-001',
+    system: 'mame',
+    systemName: 'GroovyMAME (Neo-Geo MVS)',
+    romName: 'mslug.zip',
+    romPath: 'C:\\Emulators\\GroovyMAME\\roms\\mslug.zip',
+    emulatorId: 'groovymame',
+    videoMode: '15kHz 224p @ 59.18Hz',
+    resolution: '320x224',
+    modeline: '"320x224_59.18" 6.00 320 336 368 416 224 232 235 253 -hsync -vsync',
+    description: 'SNK run-and-gun classic outputting authentic 320x224 RGB video directly to your MiSTer CRT arcade monitor.',
+    year: 1996,
+    genre: 'Run & Gun',
+    bannerColor: 'from-emerald-950/80 to-green-900/40'
+  },
+  {
+    id: 'mame_kof98',
+    title: "The King of Fighters '98: The Slugfest",
+    system: 'mame',
+    systemName: 'GroovyMAME (Neo-Geo MVS)',
+    romName: 'kof98.zip',
+    romPath: 'C:\\Emulators\\GroovyMAME\\roms\\kof98.zip',
+    emulatorId: 'groovymame',
+    videoMode: '15kHz 224p @ 59.18Hz',
+    resolution: '320x224',
+    modeline: '"320x224_59.18" 6.00 320 336 368 416 224 232 235 253 -hsync -vsync',
+    description: 'Premier competitive fighting tournament standard with instant switchres timing.',
+    year: 1998,
     genre: 'Fighting (2D)',
-    bannerColor: 'from-amber-950/80 to-orange-900/40'
+    bannerColor: 'from-orange-950/80 to-red-900/40'
   },
   {
     id: 'gc_smash_melee',
@@ -119,6 +135,22 @@ export const INITIAL_GAMES: GameItem[] = [
     bannerColor: 'from-indigo-950/80 to-blue-900/40'
   },
   {
+    id: 'naomi_vf4ft',
+    title: 'Virtua Fighter 4 Final Tuned',
+    system: 'naomi',
+    systemName: 'Sega Naomi 2 Arcade',
+    romName: 'vf4ft.zip',
+    romPath: 'C:\\Games\\Arcade\\Naomi\\vf4ft.zip',
+    emulatorId: 'flycast',
+    videoMode: '15kHz 240p @ 60Hz',
+    resolution: '640x480',
+    modeline: '"640x480_60" 25.17 640 656 752 800 480 490 492 525 -hsync -vsync',
+    description: 'Definitive technical 3D fighter created by Sega AM2. Delivered to your cabinet monitor in authentic 15kHz arcade resolution.',
+    year: 2004,
+    genre: 'Fighting (3D)',
+    bannerColor: 'from-cyan-950/80 to-sky-900/40'
+  },
+  {
     id: 'wii_tvc',
     title: 'Tatsunoko vs. Capcom: Ultimate All-Stars',
     system: 'wii',
@@ -135,20 +167,36 @@ export const INITIAL_GAMES: GameItem[] = [
     bannerColor: 'from-red-950/80 to-amber-900/40'
   },
   {
-    id: 'naomi_vf4ft',
-    title: 'Virtua Fighter 4 Final Tuned',
-    system: 'naomi',
-    systemName: 'Sega Naomi 2 Arcade',
-    romName: 'vf4ft.zip',
-    romPath: 'C:\\Games\\Arcade\\Naomi\\vf4ft.zip',
-    emulatorId: 'flycast',
-    videoMode: '15kHz / 31kHz Dual',
-    resolution: '640x480',
-    modeline: '"640x480_60" 25.175 640 656 752 800 480 490 492 525 -hsync -vsync',
-    description: 'The definitive competitive revision of Virtua Fighter 4, featuring tuned frame data and deep 3D martial arts combat.',
-    year: 2004,
-    genre: '3D Fighting',
-    bannerColor: 'from-emerald-950/80 to-teal-900/40'
+    id: 'ps2_cvs2',
+    title: 'Capcom vs. SNK 2: Mark of the Millennium',
+    system: 'ps2',
+    systemName: 'Sony PlayStation 2',
+    romName: 'CapcomVsSNK2.iso',
+    romPath: 'C:\\Games\\PS2\\CapcomVsSNK2.iso',
+    emulatorId: 'pcsx2',
+    videoMode: '15kHz 240p @ 59.94Hz',
+    resolution: '640x224',
+    modeline: '"640x224_60" 12.80 640 664 728 800 224 236 239 262 -hsync -vsync',
+    description: 'The pinnacle of crossover 2D fighting games featuring the Groove system and competitive arcade mechanics.',
+    year: 2001,
+    genre: 'Fighting (2D)',
+    bannerColor: 'from-amber-950/80 to-orange-900/40'
+  },
+  {
+    id: 'ps2_arcana_heart',
+    title: 'Arcana Heart',
+    system: 'ps2',
+    systemName: 'Sony PlayStation 2',
+    romName: 'ArcanaHeart.iso',
+    romPath: 'C:\\Games\\PS2\\ArcanaHeart.iso',
+    emulatorId: 'pcsx2',
+    videoMode: '15kHz 240p @ 60Hz',
+    resolution: '640x224',
+    modeline: '"640x224_60" 12.80 640 664 728 800 224 236 239 262 -hsync -vsync',
+    description: 'High-speed 2D anime fighting game developed by Examu. Demands instantaneous stick input and scanline-accurate CRT rendering.',
+    year: 2006,
+    genre: 'Fighting (2D)',
+    bannerColor: 'from-pink-950/80 to-rose-900/40'
   },
   {
     id: 'model2_daytona',

@@ -8,6 +8,7 @@
 set -e
 
 PC_IP="${1:-192.168.1.100}"
+UDP_PORT="${2:-1999}"
 
 echo "========================================================"
 echo "    Installing Phantom Arcade on MiSTer DE10-Nano...    "
@@ -28,7 +29,7 @@ echo "[*] Writing config to /media/fat/config/phantom.ini..."
 cat <<EOF > /media/fat/config/phantom.ini
 [SERVER]
 PC_SERVER_IP=${PC_IP}
-UDP_PORT=2154
+UDP_PORT=${UDP_PORT}
 HTTP_PORT=8088
 AUTO_DISCOVERY=true
 EOF

@@ -42,10 +42,10 @@ export const ArcadeSimulator: React.FC<ArcadeSimulatorProps> = ({
   const [activePid, setActivePid] = useState<number | null>(null);
   const [serverLogs, setServerLogs] = useState<string[]>([
     '[21:04:12] [INFO] Phantom Arcade Bridge Daemon v1.2 initialized',
-    '[21:04:12] [INFO] Listening for UDP commands on 0.0.0.0:2154',
+    '[21:04:12] [INFO] Listening for UDP commands on 0.0.0.0:1999 (Groovy_MiSTer default)',
     '[21:04:12] [INFO] HTTP Catalog service online at http://0.0.0.0:8088/catalog.json',
     '[21:04:15] [INFO] MiSTer FPGA client detected at 192.168.1.50 (DE10-Nano)',
-    '[21:04:15] [INFO] Handshake acknowledged. Groovy_MiSTer video streamer ready.'
+    '[21:04:15] [INFO] Handshake acknowledged. Groovy_MiSTer SwitchRes video streamer ready.'
   ]);
 
   // Hotkey hold timer for arcade stick Start+Coin exit
@@ -488,7 +488,7 @@ export const ArcadeSimulator: React.FC<ArcadeSimulatorProps> = ({
             </div>
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span className="text-emerald-400 font-medium">Listening :2154</span>
+              <span className="text-emerald-400 font-medium">Listening :1999 (UDP)</span>
             </div>
           </div>
 

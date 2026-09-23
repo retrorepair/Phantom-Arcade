@@ -13,7 +13,7 @@
 CONFIG_FILE="/media/fat/config/phantom.ini"
 GROOVY_CORE="/media/fat/_Groovy/groovy.rbf"
 MENU_CORE="/media/fat/menu.rbf"
-UDP_PORT=2154
+UDP_PORT=1999
 HTTP_PORT=8088
 PC_IP=""
 
@@ -30,7 +30,7 @@ C_RED="\033[1;31m"
 clear
 echo -e "${C_AMBER_BOLD}======================================================${C_RESET}"
 echo -e "${C_AMBER_BOLD}       PHANTOM ARCADE — GROOVY_MISTER CLIENT          ${C_RESET}"
-echo -e "${C_DIM}        Zero-Config 15kHz CRT Arcade Launcher         ${C_RESET}"
+echo -e "${C_DIM}     Zero-Config 15kHz CRT Arcade Launcher (UDP:1999)  ${C_RESET}"
 echo -e "${C_AMBER_BOLD}======================================================${C_RESET}"
 echo ""
 
@@ -47,42 +47,65 @@ if [ ! -f "$GROOVY_CORE" ]; then
     fi
 fi
 
-# 2. Check for configured IP or Auto-Discover
+# 2. Check for configured IP & Port or Auto-Discover
 if [ -f "$CONFIG_FILE" ]; then
     PC_IP=$(grep -E "^PC_SERVER_IP=" "$CONFIG_FILE" | cut -d'=' -f2 | tr -d ' \r\n')
+    SAVED_PORT=$(grep -E "^UDP_PORT=" "$CONFIG_FILE" | cut -d'=' -f2 | tr -d ' \r\n')
+    if [ -n "$SAVED_PORT" ]; then
+        UDP_PORT="$SAVED_PORT"
+    fi
 fi
 
 if [ -z "$PC_IP" ]; then
-    echo -e "${C_WHITE}[*] Searching LAN for Phantom Arcade PC Host...${C_RESET}"
-    # Broadcast discovery probe via UDP broadcast
-    RESPONSE=$(python3 -c "
+    echo -e "${C_WHITE}[*] Searching LAN for Phantom Arcade PC Host (Testing ports 1999 & 2154)...${C_RESET}"
+    # Broadcast discovery probe via UDP broadcast across ports
+    DISCOVERY_RESULT=$(python3 -c "
 import socket, sys
-s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-s.settimeout(2.0)
-try:
-    s.sendto(b'DISCOVER_PHANTOM', ('255.255.255.255', 2154))
-    data, addr = s.recvfrom(1024)
-    msg = data.decode('utf-8', errors='ignore')
-    if 'PHANTOM_HOST' in msg:
-        print(addr[0])
-except:
-    pass
+
+for test_port in [1999, 2154]:
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    s.settimeout(1.5)
+    try:
+        s.sendto(b'DISCOVER_PHANTOM', ('255.255.255.255', test_port))
+        data, addr = s.recvfrom(1024)
+        msg = data.decode('utf-8', errors='ignore')
+        if 'PHANTOM_HOST' in msg:
+            port = test_port
+            if ':' in msg:
+                parts = msg.split(':')
+                if len(parts) >= 2 and parts[-1].isdigit():
+                    port = int(parts[-1])
+            print(f'{addr[0]}:{port}')
+            sys.exit(0)
+    except:
+        pass
+    finally:
+        s.close()
 " 2>/dev/null)
 
-    if [ -n "$RESPONSE" ]; then
-        PC_IP="$RESPONSE"
-        echo -e "${C_GREEN}[✓] Discovered PC Server at: ${PC_IP}${C_RESET}"
+    if [ -n "$DISCOVERY_RESULT" ]; then
+        PC_IP=$(echo "$DISCOVERY_RESULT" | cut -d':' -f1)
+        DISC_PORT=$(echo "$DISCOVERY_RESULT" | cut -d':' -f2)
+        if [ -n "$DISC_PORT" ]; then
+            UDP_PORT="$DISC_PORT"
+        fi
+        echo -e "${C_GREEN}[✓] Discovered PC Server at: ${PC_IP} (UDP Port: ${UDP_PORT})${C_RESET}"
         mkdir -p "/media/fat/config"
         echo "PC_SERVER_IP=$PC_IP" > "$CONFIG_FILE"
+        echo "UDP_PORT=$UDP_PORT" >> "$CONFIG_FILE"
     else
-        # If auto-discovery fails, check default subnet or prompt
         DEFAULT_GW=$(ip route | grep default | awk '{print $3}' | cut -d'.' -f1-3)
         echo -e "${C_AMBER}[?] Auto-discovery timed out.${C_RESET}"
         read -p "Enter your PC Server IP (e.g. ${DEFAULT_GW}.100): " PC_IP
+        read -p "Enter UDP Port [default 1999]: " USER_PORT
+        if [ -n "$USER_PORT" ]; then
+            UDP_PORT="$USER_PORT"
+        fi
         if [ -n "$PC_IP" ]; then
             mkdir -p "/media/fat/config"
             echo "PC_SERVER_IP=$PC_IP" > "$CONFIG_FILE"
+            echo "UDP_PORT=$UDP_PORT" >> "$CONFIG_FILE"
         else
             echo "No IP provided. Exiting."
             exit 1

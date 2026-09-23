@@ -6,9 +6,9 @@
  * 
  * Description:
  *   Native Windows desktop setup tool and daemon launcher for the Phantom Arcade
- *   Groovy_MiSTer bridge. Allows users to point to ROM folders, emulator paths,
- *   set MiSTer IP, auto-scan games, and start/stop the background UDP daemon.
- *   Includes Auto-Discovery responder for zero-config MiSTer client setup!
+ *   Groovy_MiSTer bridge. Supports GroovyMAME (official Calamity 15kHz streaming),
+ *   Dolphin, Flycast, and custom emulators.
+ *   Fully dynamic UDP port configuration (default 1999) and LAN auto-discovery.
  * ============================================================================
  */
 
@@ -38,45 +38,52 @@
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "comdlg32.lib")
 #pragma comment(lib, "shell32.lib")
+#pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
 
 namespace fs = std::filesystem;
 
 // Control IDs
-#define IDC_EDIT_MISTER_IP     101
-#define IDC_EDIT_UDP_PORT      102
-#define IDC_EDIT_PCSX2_EXE     103
-#define IDC_BTN_BROWSE_PCSX2   104
-#define IDC_EDIT_PS2_ROMS      105
-#define IDC_BTN_BROWSE_PS2ROMS 106
-#define IDC_EDIT_DOLPHIN_EXE   107
-#define IDC_BTN_BROWSE_DOLPHIN 108
-#define IDC_EDIT_GC_ROMS       109
-#define IDC_BTN_BROWSE_GCROMS  110
-#define IDC_EDIT_FLYCAST_EXE   111
-#define IDC_BTN_BROWSE_FLYCAST 112
-#define IDC_EDIT_NAOMI_ROMS    113
-#define IDC_BTN_BROWSE_NAOMI   114
-#define IDC_BTN_SCAN_ROMS      115
-#define IDC_BTN_TEST_MISTER    116
-#define IDC_BTN_SAVE_CONFIG    117
-#define IDC_BTN_TOGGLE_DAEMON  118
-#define IDC_STATIC_STATUS      119
-#define IDC_LIST_GAMES         120
+#define IDC_EDIT_MISTER_IP       101
+#define IDC_EDIT_UDP_PORT        102
+#define IDC_EDIT_GROOVYMAME_EXE  103
+#define IDC_BTN_BROWSE_MAME_EXE  104
+#define IDC_EDIT_MAME_ROMS       105
+#define IDC_BTN_BROWSE_MAME_ROMS 106
+#define IDC_EDIT_DOLPHIN_EXE     107
+#define IDC_BTN_BROWSE_DOLPHIN   108
+#define IDC_EDIT_GC_ROMS         109
+#define IDC_BTN_BROWSE_GCROMS    110
+#define IDC_EDIT_FLYCAST_EXE     111
+#define IDC_BTN_BROWSE_FLYCAST   112
+#define IDC_EDIT_NAOMI_ROMS      113
+#define IDC_BTN_BROWSE_NAOMI     114
+#define IDC_EDIT_PCSX2_EXE       115
+#define IDC_BTN_BROWSE_PCSX2     116
+#define IDC_EDIT_PS2_ROMS        117
+#define IDC_BTN_BROWSE_PS2ROMS   118
+#define IDC_BTN_SCAN_ROMS        119
+#define IDC_BTN_TEST_MISTER      120
+#define IDC_BTN_SAVE_CONFIG      121
+#define IDC_BTN_TOGGLE_DAEMON    122
+#define IDC_STATIC_STATUS        123
+#define IDC_LIST_GAMES           124
 
 // Global State
 HINSTANCE hInst = NULL;
 HWND hMainWnd = NULL;
 HWND hEditMisterIp, hEditUdpPort;
-HWND hEditPcsx2Exe, hEditPs2Roms;
+HWND hEditMameExe, hEditMameRoms;
 HWND hEditDolphinExe, hEditGcRoms;
 HWND hEditFlycastExe, hEditNaomiRoms;
+HWND hEditPcsx2Exe, hEditPs2Roms;
 HWND hStaticStatus, hListGames;
 HWND hBtnToggleDaemon;
 
 std::atomic<bool> g_daemonRunning(false);
 std::atomic<DWORD> g_activePid(0);
+std::atomic<int> g_configuredPort(1999);
 SOCKET g_udpSocket = INVALID_SOCKET;
 HANDLE g_hDaemonThread = NULL;
 
@@ -123,44 +130,62 @@ std::wstring GetText(HWND hWnd) {
     return std::wstring(buf.data());
 }
 
+// Helper: Get integer port from edit box with fallback
+int GetPortFromUI() {
+    std::wstring portStr = GetText(hEditUdpPort);
+    if (portStr.empty()) return 1999;
+    try {
+        int val = std::stoi(portStr);
+        if (val > 0 && val <= 65535) return val;
+    } catch (...) {}
+    return 1999;
+}
+
 // Save Configuration to phantom_config.json
 void SaveConfiguration() {
     std::wstring misterIp = GetText(hEditMisterIp);
-    std::wstring udpPort = GetText(hEditUdpPort);
-    std::wstring pcsx2Exe = GetText(hEditPcsx2Exe);
+    int port = GetPortFromUI();
+    std::wstring mameExe = GetText(hEditMameExe);
     std::wstring dolphinExe = GetText(hEditDolphinExe);
     std::wstring flycastExe = GetText(hEditFlycastExe);
+    std::wstring pcsx2Exe = GetText(hEditPcsx2Exe);
 
     std::ofstream out("phantom_config.json");
     if (out.is_open()) {
         out << "{\n";
         out << "  \"server\": {\n";
         out << "    \"listen_ip\": \"0.0.0.0\",\n";
-        out << "    \"udp_port\": " << (udpPort.empty() ? L"2154" : udpPort.c_str()) << ",\n";
+        out << "    \"udp_port\": " << port << ",\n";
         out << "    \"http_port\": 8088,\n";
         out << "    \"mister_client_ip\": \"" << std::string(misterIp.begin(), misterIp.end()) << "\"\n";
         out << "  },\n";
         out << "  \"emulators\": {\n";
-        out << "    \"ps2\": {\n";
-        out << "      \"exe\": \"" << std::string(pcsx2Exe.begin(), pcsx2Exe.end()) << "\",\n";
-        out << "      \"args\": \"-batch -fullscreen -elf \\\"{rom}\\\"\",\n";
-        out << "      \"pipeline\": \"Groovy_MiSTer D3D9\"\n";
+        out << "    \"groovymame\": {\n";
+        out << "      \"exe\": \"" << std::string(mameExe.begin(), mameExe.end()) << "\",\n";
+        out << "      \"args\": \"-video mister -mister_ip " << std::string(misterIp.begin(), misterIp.end()) << " -mister_port " << port << " \\\"{rom_stem}\\\"\",\n";
+        out << "      \"pipeline\": \"Groovy_MiSTer SwitchRes 15kHz Direct\"\n";
         out << "    },\n";
-        out << "    \"gamecube\": {\n";
+        out << "    \"dolphin\": {\n";
         out << "      \"exe\": \"" << std::string(dolphinExe.begin(), dolphinExe.end()) << "\",\n";
         out << "      \"args\": \"-b -e \\\"{rom}\\\"\",\n";
-        out << "      \"pipeline\": \"Groovy_MiSTer Vulkan\"\n";
+        out << "      \"pipeline\": \"Groovy_MiSTer 480i/240p\"\n";
         out << "    },\n";
-        out << "    \"naomi\": {\n";
+        out << "    \"flycast\": {\n";
         out << "      \"exe\": \"" << std::string(flycastExe.begin(), flycastExe.end()) << "\",\n";
         out << "      \"args\": \"\\\"{rom}\\\"\",\n";
-        out << "      \"pipeline\": \"SwitchRes Direct\"\n";
+        out << "      \"pipeline\": \"SwitchRes Direct 15kHz\"\n";
+        out << "    },\n";
+        out << "    \"pcsx2\": {\n";
+        out << "      \"exe\": \"" << std::string(pcsx2Exe.begin(), pcsx2Exe.end()) << "\",\n";
+        out << "      \"args\": \"-batch -fullscreen \\\"{rom}\\\"\",\n";
+        out << "      \"pipeline\": \"Custom Pipeline (Experimental)\"\n";
         out << "    }\n";
         out << "  }\n";
         out << "}\n";
         out.close();
 
-        SetWindowText(hStaticStatus, L"Status: Configuration saved to phantom_config.json");
+        std::wstring msg = L"Status: Configuration saved to phantom_config.json (UDP Port: " + std::to_wstring(port) + L")";
+        SetWindowText(hStaticStatus, msg.c_str());
     } else {
         SetWindowText(hStaticStatus, L"Error: Failed to write phantom_config.json");
     }
@@ -179,9 +204,10 @@ void ScanRomDirectories() {
     };
 
     std::vector<ScanTarget> targets = {
-        { GetText(hEditPs2Roms), "ps2", "Sony PlayStation 2", "15kHz 240p @ 60Hz", "640x224" },
-        { GetText(hEditGcRoms), "gamecube", "Nintendo GameCube", "15kHz 480i @ 60Hz", "640x480i" },
-        { GetText(hEditNaomiRoms), "naomi", "Sega Naomi Arcade", "15kHz / 31kHz Dual", "640x480" }
+        { GetText(hEditMameRoms), "groovymame", "GroovyMAME Arcade", "15kHz 240p Native", "Dynamic SwitchRes" },
+        { GetText(hEditGcRoms), "dolphin", "GameCube / Wii", "15kHz 480i @ 60Hz", "640x480i" },
+        { GetText(hEditNaomiRoms), "flycast", "Sega Naomi / DC Arcade", "15kHz 240p / 480i", "640x480" },
+        { GetText(hEditPs2Roms), "pcsx2", "Sony PlayStation 2", "15kHz 240p / 480i", "640x224" }
     };
 
     std::ofstream catOut("games_catalog.json");
@@ -192,37 +218,39 @@ void ScanRomDirectories() {
     for (const auto& target : targets) {
         if (target.path.empty() || !fs::exists(target.path)) continue;
 
-        for (const auto& entry : fs::directory_iterator(target.path)) {
-            if (entry.is_regular_file()) {
-                auto ext = entry.path().extension().string();
-                for (auto& c : ext) c = tolower(c);
+        try {
+            for (const auto& entry : fs::directory_iterator(target.path)) {
+                if (entry.is_regular_file()) {
+                    auto ext = entry.path().extension().string();
+                    for (auto& c : ext) c = tolower(c);
 
-                if (ext == ".iso" || ext == ".chd" || ext == ".cso" || ext == ".zip" || ext == ".elf") {
-                    std::string filename = entry.path().filename().string();
-                    std::string stem = entry.path().stem().string();
-                    std::string id = target.system + "_" + stem;
+                    if (ext == ".zip" || ext == ".7z" || ext == ".iso" || ext == ".chd" || ext == ".cso" || ext == ".elf") {
+                        std::string filename = entry.path().filename().string();
+                        std::string stem = entry.path().stem().string();
+                        std::string id = target.system + "_" + stem;
 
-                    // Add to UI listbox
-                    std::wstring listEntry = L"[" + std::wstring(target.system.begin(), target.system.end()) + L"] " +
-                                            std::wstring(stem.begin(), stem.end());
-                    SendMessage(hListGames, LB_ADDSTRING, 0, (LPARAM)listEntry.c_str());
+                        // Add to UI listbox
+                        std::wstring listEntry = L"[" + std::wstring(target.system.begin(), target.system.end()) + L"] " +
+                                                std::wstring(stem.begin(), stem.end());
+                        SendMessage(hListGames, LB_ADDSTRING, 0, (LPARAM)listEntry.c_str());
 
-                    // Append to JSON
-                    if (totalFound > 0) catOut << ",\n";
-                    catOut << "    {\n";
-                    catOut << "      \"id\": \"" << id << "\",\n";
-                    catOut << "      \"title\": \"" << stem << "\",\n";
-                    catOut << "      \"system\": \"" << target.system << "\",\n";
-                    catOut << "      \"systemName\": \"" << target.systemName << "\",\n";
-                    catOut << "      \"romName\": \"" << filename << "\",\n";
-                    catOut << "      \"romPath\": \"" << entry.path().string() << "\",\n";
-                    catOut << "      \"videoMode\": \"" << target.videoMode << "\",\n";
-                    catOut << "      \"resolution\": \"" << target.resolution << "\"\n";
-                    catOut << "    }";
-                    totalFound++;
+                        // Append to JSON
+                        if (totalFound > 0) catOut << ",\n";
+                        catOut << "    {\n";
+                        catOut << "      \"id\": \"" << id << "\",\n";
+                        catOut << "      \"title\": \"" << stem << "\",\n";
+                        catOut << "      \"system\": \"" << target.system << "\",\n";
+                        catOut << "      \"systemName\": \"" << target.systemName << "\",\n";
+                        catOut << "      \"romName\": \"" << filename << "\",\n";
+                        catOut << "      \"romPath\": \"" << entry.path().string() << "\",\n";
+                        catOut << "      \"videoMode\": \"" << target.videoMode << "\",\n";
+                        catOut << "      \"resolution\": \"" << target.resolution << "\"\n";
+                        catOut << "    }";
+                        totalFound++;
+                    }
                 }
             }
-        }
+        } catch (...) {}
     }
 
     catOut << "\n  ]\n}\n";
@@ -232,13 +260,15 @@ void ScanRomDirectories() {
     SetWindowText(hStaticStatus, statusMsg.c_str());
 }
 
-// Test Handshake with MiSTer IP via UDP PING
+// Test Handshake with MiSTer IP via UDP PING using configured port
 void TestMisterHandshake() {
     std::wstring ipStr = GetText(hEditMisterIp);
     if (ipStr.empty()) {
         MessageBox(hMainWnd, L"Please enter a valid MiSTer IP address.", L"Error", MB_ICONERROR);
         return;
     }
+
+    int port = GetPortFromUI();
 
     WSADATA wsa;
     WSAStartup(MAKEWORD(2, 2), &wsa);
@@ -249,7 +279,7 @@ void TestMisterHandshake() {
 
     sockaddr_in addr = { 0 };
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(2154);
+    addr.sin_port = htons(port);
     std::string ip(ipStr.begin(), ipStr.end());
     inet_pton(AF_INET, ip.c_str(), &addr.sin_addr);
 
@@ -261,11 +291,16 @@ void TestMisterHandshake() {
     int recvLen = recvfrom(sock, buf, sizeof(buf) - 1, 0, (sockaddr*)&addr, &fromLen);
 
     if (recvLen > 0) {
-        SetWindowText(hStaticStatus, L"Status: MiSTer Handshake Successful! (Replied: PONG)");
-        MessageBox(hMainWnd, L"MiSTer client acknowledged UDP handshake!", L"Success", MB_ICONINFORMATION);
+        std::wstring successMsg = L"Status: MiSTer Handshake Successful on port " + std::to_wstring(port) + L"! (Replied: PONG)";
+        SetWindowText(hStaticStatus, successMsg.c_str());
+        std::wstring dialogMsg = L"MiSTer client acknowledged UDP handshake on port " + std::to_wstring(port) + L"!";
+        MessageBox(hMainWnd, dialogMsg.c_str(), L"Success", MB_ICONINFORMATION);
     } else {
-        SetWindowText(hStaticStatus, L"Status: MiSTer timed out. Verify script is running on DE10-Nano.");
-        MessageBox(hMainWnd, L"Could not reach MiSTer on port 2154. Ensure network cables and phantom script are active.", L"Timeout", MB_ICONWARNING);
+        std::wstring statusErr = L"Status: MiSTer timed out on port " + std::to_wstring(port) + L". Verify script is running on DE10-Nano.";
+        SetWindowText(hStaticStatus, statusErr.c_str());
+        std::wstring errDialog = L"Could not reach MiSTer on port " + std::to_wstring(port) + 
+                                L". Ensure network cables, MiSTer IP, and Groovy_MiSTer script are active.";
+        MessageBox(hMainWnd, errDialog.c_str(), L"Timeout", MB_ICONWARNING);
     }
 
     closesocket(sock);
@@ -274,13 +309,15 @@ void TestMisterHandshake() {
 
 // Background UDP Daemon Worker Thread Function
 DWORD WINAPI DaemonThreadProc(LPVOID lpParam) {
+    int port = g_configuredPort.load();
+
     WSADATA wsa;
     WSAStartup(MAKEWORD(2, 2), &wsa);
 
     g_udpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     sockaddr_in bindAddr = { 0 };
     bindAddr.sin_family = AF_INET;
-    bindAddr.sin_port = htons(2154);
+    bindAddr.sin_port = htons(port);
     bindAddr.sin_addr.s_addr = INADDR_ANY;
 
     bind(g_udpSocket, (sockaddr*)&bindAddr, sizeof(bindAddr));
@@ -297,10 +334,9 @@ DWORD WINAPI DaemonThreadProc(LPVOID lpParam) {
 
             if (msg.rfind("DISCOVER_PHANTOM", 0) == 0) {
                 // Auto-discovery response
-                const char* reply = "PHANTOM_HOST_ONLINE";
-                sendto(g_udpSocket, reply, (int)strlen(reply), 0, (sockaddr*)&clientAddr, clientLen);
+                std::string reply = "PHANTOM_HOST_ONLINE:" + std::to_string(port);
+                sendto(g_udpSocket, reply.c_str(), (int)reply.length(), 0, (sockaddr*)&clientAddr, clientLen);
             } else if (msg.rfind("LAUNCH:", 0) == 0) {
-                std::string gameId = msg.substr(7);
                 // Launch requested emulator process...
                 const char* reply = "ACK:LAUNCH:OK";
                 sendto(g_udpSocket, reply, (int)strlen(reply), 0, (sockaddr*)&clientAddr, clientLen);
@@ -331,10 +367,13 @@ DWORD WINAPI DaemonThreadProc(LPVOID lpParam) {
 // Toggle Daemon State
 void ToggleDaemon() {
     if (!g_daemonRunning) {
+        int port = GetPortFromUI();
+        g_configuredPort = port;
         g_daemonRunning = true;
         g_hDaemonThread = CreateThread(NULL, 0, DaemonThreadProc, NULL, 0, NULL);
         SetWindowText(hBtnToggleDaemon, L"Stop Background Daemon");
-        SetWindowText(hStaticStatus, L"Status: Daemon ACTIVE (Listening on UDP :2154 with Auto-Discovery)");
+        std::wstring status = L"Status: Daemon ACTIVE (Listening on UDP :" + std::to_wstring(port) + L" with Auto-Discovery)";
+        SetWindowText(hStaticStatus, status.c_str());
     } else {
         g_daemonRunning = false;
         if (g_udpSocket != INVALID_SOCKET) {
@@ -355,75 +394,86 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
     case WM_CREATE: {
         int y = 15;
-        // MiSTer IP
-        CreateWindow(L"STATIC", L"MiSTer FPGA IP Address:", WS_CHILD | WS_VISIBLE, 20, y, 180, 20, hWnd, NULL, hInst, NULL);
-        hEditMisterIp = CreateWindow(L"EDIT", L"192.168.1.50", WS_CHILD | WS_VISIBLE | WS_BORDER, 210, y, 160, 22, hWnd, (HMENU)IDC_EDIT_MISTER_IP, hInst, NULL);
-        CreateWindow(L"STATIC", L"UDP Port:", WS_CHILD | WS_VISIBLE, 390, y, 70, 20, hWnd, NULL, hInst, NULL);
-        hEditUdpPort = CreateWindow(L"EDIT", L"2154", WS_CHILD | WS_VISIBLE | WS_BORDER, 470, y, 80, 22, hWnd, (HMENU)IDC_EDIT_UDP_PORT, hInst, NULL);
+        // MiSTer IP & UDP Port (Default 1999)
+        CreateWindow(L"STATIC", L"MiSTer FPGA IP Address:", WS_CHILD | WS_VISIBLE, 20, y, 170, 20, hWnd, NULL, hInst, NULL);
+        hEditMisterIp = CreateWindow(L"EDIT", L"192.168.1.50", WS_CHILD | WS_VISIBLE | WS_BORDER, 195, y, 160, 22, hWnd, (HMENU)IDC_EDIT_MISTER_IP, hInst, NULL);
+        CreateWindow(L"STATIC", L"UDP Port (Default 1999):", WS_CHILD | WS_VISIBLE, 375, y, 160, 20, hWnd, NULL, hInst, NULL);
+        hEditUdpPort = CreateWindow(L"EDIT", L"1999", WS_CHILD | WS_VISIBLE | WS_BORDER, 545, y, 95, 22, hWnd, (HMENU)IDC_EDIT_UDP_PORT, hInst, NULL);
 
-        // PCSX2 Executable & ROMs
+        // 1. GroovyMAME (Direct 15kHz Calamity SwitchRes Support)
         y += 35;
-        CreateWindow(L"STATIC", L"PCSX2 Executable:", WS_CHILD | WS_VISIBLE, 20, y, 180, 20, hWnd, NULL, hInst, NULL);
-        hEditPcsx2Exe = CreateWindow(L"EDIT", L"C:\\Emulators\\PCSX2\\pcsx2-qt.exe", WS_CHILD | WS_VISIBLE | WS_BORDER, 210, y, 340, 22, hWnd, (HMENU)IDC_EDIT_PCSX2_EXE, hInst, NULL);
-        CreateWindow(L"BUTTON", L"Browse...", WS_CHILD | WS_VISIBLE, 560, y, 80, 22, hWnd, (HMENU)IDC_BTN_BROWSE_PCSX2, hInst, NULL);
+        CreateWindow(L"STATIC", L"GroovyMAME Executable:", WS_CHILD | WS_VISIBLE, 20, y, 170, 20, hWnd, NULL, hInst, NULL);
+        hEditMameExe = CreateWindow(L"EDIT", L"C:\\Emulators\\GroovyMAME\\groovymame64.exe", WS_CHILD | WS_VISIBLE | WS_BORDER, 195, y, 350, 22, hWnd, (HMENU)IDC_EDIT_GROOVYMAME_EXE, hInst, NULL);
+        CreateWindow(L"BUTTON", L"Browse...", WS_CHILD | WS_VISIBLE, 555, y, 85, 22, hWnd, (HMENU)IDC_BTN_BROWSE_MAME_EXE, hInst, NULL);
 
-        y += 30;
-        CreateWindow(L"STATIC", L"PS2 ROMs Folder:", WS_CHILD | WS_VISIBLE, 20, y, 180, 20, hWnd, NULL, hInst, NULL);
-        hEditPs2Roms = CreateWindow(L"EDIT", L"C:\\Games\\PS2", WS_CHILD | WS_VISIBLE | WS_BORDER, 210, y, 340, 22, hWnd, (HMENU)IDC_EDIT_PS2_ROMS, hInst, NULL);
-        CreateWindow(L"BUTTON", L"Browse...", WS_CHILD | WS_VISIBLE, 560, y, 80, 22, hWnd, (HMENU)IDC_BTN_BROWSE_PS2ROMS, hInst, NULL);
+        y += 28;
+        CreateWindow(L"STATIC", L"GroovyMAME ROMs Folder:", WS_CHILD | WS_VISIBLE, 20, y, 170, 20, hWnd, NULL, hInst, NULL);
+        hEditMameRoms = CreateWindow(L"EDIT", L"C:\\Emulators\\GroovyMAME\\roms", WS_CHILD | WS_VISIBLE | WS_BORDER, 195, y, 350, 22, hWnd, (HMENU)IDC_EDIT_MAME_ROMS, hInst, NULL);
+        CreateWindow(L"BUTTON", L"Browse...", WS_CHILD | WS_VISIBLE, 555, y, 85, 22, hWnd, (HMENU)IDC_BTN_BROWSE_MAME_ROMS, hInst, NULL);
 
-        // Dolphin Executable & ROMs
+        // 2. Dolphin (GameCube / Wii)
         y += 35;
-        CreateWindow(L"STATIC", L"Dolphin Executable:", WS_CHILD | WS_VISIBLE, 20, y, 180, 20, hWnd, NULL, hInst, NULL);
-        hEditDolphinExe = CreateWindow(L"EDIT", L"C:\\Emulators\\Dolphin\\Dolphin.exe", WS_CHILD | WS_VISIBLE | WS_BORDER, 210, y, 340, 22, hWnd, (HMENU)IDC_EDIT_DOLPHIN_EXE, hInst, NULL);
-        CreateWindow(L"BUTTON", L"Browse...", WS_CHILD | WS_VISIBLE, 560, y, 80, 22, hWnd, (HMENU)IDC_BTN_BROWSE_DOLPHIN, hInst, NULL);
+        CreateWindow(L"STATIC", L"Dolphin Executable:", WS_CHILD | WS_VISIBLE, 20, y, 170, 20, hWnd, NULL, hInst, NULL);
+        hEditDolphinExe = CreateWindow(L"EDIT", L"C:\\Emulators\\Dolphin\\Dolphin.exe", WS_CHILD | WS_VISIBLE | WS_BORDER, 195, y, 350, 22, hWnd, (HMENU)IDC_EDIT_DOLPHIN_EXE, hInst, NULL);
+        CreateWindow(L"BUTTON", L"Browse...", WS_CHILD | WS_VISIBLE, 555, y, 85, 22, hWnd, (HMENU)IDC_BTN_BROWSE_DOLPHIN, hInst, NULL);
 
-        y += 30;
-        CreateWindow(L"STATIC", L"GameCube/Wii ROMs:", WS_CHILD | WS_VISIBLE, 20, y, 180, 20, hWnd, NULL, hInst, NULL);
-        hEditGcRoms = CreateWindow(L"EDIT", L"C:\\Games\\GameCube", WS_CHILD | WS_VISIBLE | WS_BORDER, 210, y, 340, 22, hWnd, (HMENU)IDC_EDIT_GC_ROMS, hInst, NULL);
-        CreateWindow(L"BUTTON", L"Browse...", WS_CHILD | WS_VISIBLE, 560, y, 80, 22, hWnd, (HMENU)IDC_BTN_BROWSE_GCROMS, hInst, NULL);
+        y += 28;
+        CreateWindow(L"STATIC", L"GameCube/Wii ROMs:", WS_CHILD | WS_VISIBLE, 20, y, 170, 20, hWnd, NULL, hInst, NULL);
+        hEditGcRoms = CreateWindow(L"EDIT", L"C:\\Games\\GameCube", WS_CHILD | WS_VISIBLE | WS_BORDER, 195, y, 350, 22, hWnd, (HMENU)IDC_EDIT_GC_ROMS, hInst, NULL);
+        CreateWindow(L"BUTTON", L"Browse...", WS_CHILD | WS_VISIBLE, 555, y, 85, 22, hWnd, (HMENU)IDC_BTN_BROWSE_GCROMS, hInst, NULL);
 
-        // Flycast
+        // 3. Flycast (Naomi / Dreamcast Arcade)
         y += 35;
-        CreateWindow(L"STATIC", L"Flycast Executable:", WS_CHILD | WS_VISIBLE, 20, y, 180, 20, hWnd, NULL, hInst, NULL);
-        hEditFlycastExe = CreateWindow(L"EDIT", L"C:\\Emulators\\Flycast\\flycast.exe", WS_CHILD | WS_VISIBLE | WS_BORDER, 210, y, 340, 22, hWnd, (HMENU)IDC_EDIT_FLYCAST_EXE, hInst, NULL);
-        CreateWindow(L"BUTTON", L"Browse...", WS_CHILD | WS_VISIBLE, 560, y, 80, 22, hWnd, (HMENU)IDC_BTN_BROWSE_FLYCAST, hInst, NULL);
+        CreateWindow(L"STATIC", L"Flycast Executable:", WS_CHILD | WS_VISIBLE, 20, y, 170, 20, hWnd, NULL, hInst, NULL);
+        hEditFlycastExe = CreateWindow(L"EDIT", L"C:\\Emulators\\Flycast\\flycast.exe", WS_CHILD | WS_VISIBLE | WS_BORDER, 195, y, 350, 22, hWnd, (HMENU)IDC_EDIT_FLYCAST_EXE, hInst, NULL);
+        CreateWindow(L"BUTTON", L"Browse...", WS_CHILD | WS_VISIBLE, 555, y, 85, 22, hWnd, (HMENU)IDC_BTN_BROWSE_FLYCAST, hInst, NULL);
 
-        y += 30;
-        CreateWindow(L"STATIC", L"Naomi/Arcade ROMs:", WS_CHILD | WS_VISIBLE, 20, y, 180, 20, hWnd, NULL, hInst, NULL);
-        hEditNaomiRoms = CreateWindow(L"EDIT", L"C:\\Games\\Arcade\\Naomi", WS_CHILD | WS_VISIBLE | WS_BORDER, 210, y, 340, 22, hWnd, (HMENU)IDC_EDIT_NAOMI_ROMS, hInst, NULL);
-        CreateWindow(L"BUTTON", L"Browse...", WS_CHILD | WS_VISIBLE, 560, y, 80, 22, hWnd, (HMENU)IDC_BTN_BROWSE_NAOMI, hInst, NULL);
+        y += 28;
+        CreateWindow(L"STATIC", L"Naomi/Arcade ROMs:", WS_CHILD | WS_VISIBLE, 20, y, 170, 20, hWnd, NULL, hInst, NULL);
+        hEditNaomiRoms = CreateWindow(L"EDIT", L"C:\\Games\\Arcade\\Naomi", WS_CHILD | WS_VISIBLE | WS_BORDER, 195, y, 350, 22, hWnd, (HMENU)IDC_EDIT_NAOMI_ROMS, hInst, NULL);
+        CreateWindow(L"BUTTON", L"Browse...", WS_CHILD | WS_VISIBLE, 555, y, 85, 22, hWnd, (HMENU)IDC_BTN_BROWSE_NAOMI, hInst, NULL);
+
+        // 4. PCSX2 (Optional / Custom)
+        y += 35;
+        CreateWindow(L"STATIC", L"PCSX2 Executable (Opt):", WS_CHILD | WS_VISIBLE, 20, y, 170, 20, hWnd, NULL, hInst, NULL);
+        hEditPcsx2Exe = CreateWindow(L"EDIT", L"C:\\Emulators\\PCSX2\\pcsx2-qt.exe", WS_CHILD | WS_VISIBLE | WS_BORDER, 195, y, 350, 22, hWnd, (HMENU)IDC_EDIT_PCSX2_EXE, hInst, NULL);
+        CreateWindow(L"BUTTON", L"Browse...", WS_CHILD | WS_VISIBLE, 555, y, 85, 22, hWnd, (HMENU)IDC_BTN_BROWSE_PCSX2, hInst, NULL);
+
+        y += 28;
+        CreateWindow(L"STATIC", L"PS2 ROMs Folder:", WS_CHILD | WS_VISIBLE, 20, y, 170, 20, hWnd, NULL, hInst, NULL);
+        hEditPs2Roms = CreateWindow(L"EDIT", L"C:\\Games\\PS2", WS_CHILD | WS_VISIBLE | WS_BORDER, 195, y, 350, 22, hWnd, (HMENU)IDC_EDIT_PS2_ROMS, hInst, NULL);
+        CreateWindow(L"BUTTON", L"Browse...", WS_CHILD | WS_VISIBLE, 555, y, 85, 22, hWnd, (HMENU)IDC_BTN_BROWSE_PS2ROMS, hInst, NULL);
 
         // Action Buttons Row
-        y += 40;
+        y += 38;
         CreateWindow(L"BUTTON", L"1. Auto-Scan ROMs", WS_CHILD | WS_VISIBLE, 20, y, 140, 30, hWnd, (HMENU)IDC_BTN_SCAN_ROMS, hInst, NULL);
         CreateWindow(L"BUTTON", L"2. Test MiSTer Ping", WS_CHILD | WS_VISIBLE, 170, y, 140, 30, hWnd, (HMENU)IDC_BTN_TEST_MISTER, hInst, NULL);
-        CreateWindow(L"BUTTON", L"3. Save Config", WS_CHILD | WS_VISIBLE, 320, y, 130, 30, hWnd, (HMENU)IDC_BTN_SAVE_CONFIG, hInst, NULL);
-        hBtnToggleDaemon = CreateWindow(L"BUTTON", L"Start Background Daemon", WS_CHILD | WS_VISIBLE, 460, y, 180, 30, hWnd, (HMENU)IDC_BTN_TOGGLE_DAEMON, hInst, NULL);
+        CreateWindow(L"BUTTON", L"3. Save Config", WS_CHILD | WS_VISIBLE, 320, y, 120, 30, hWnd, (HMENU)IDC_BTN_SAVE_CONFIG, hInst, NULL);
+        hBtnToggleDaemon = CreateWindow(L"BUTTON", L"Start Background Daemon", WS_CHILD | WS_VISIBLE, 450, y, 190, 30, hWnd, (HMENU)IDC_BTN_TOGGLE_DAEMON, hInst, NULL);
 
         // Scanned ROMs List Box
-        y += 42;
+        y += 40;
         CreateWindow(L"STATIC", L"Detected Games Catalog:", WS_CHILD | WS_VISIBLE, 20, y, 200, 18, hWnd, NULL, hInst, NULL);
-        y += 22;
-        hListGames = CreateWindow(L"LISTBOX", NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | LBS_NOTIFY, 20, y, 620, 160, hWnd, (HMENU)IDC_LIST_GAMES, hInst, NULL);
+        y += 20;
+        hListGames = CreateWindow(L"LISTBOX", NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | LBS_NOTIFY, 20, y, 620, 140, hWnd, (HMENU)IDC_LIST_GAMES, hInst, NULL);
 
         // Status Bar
-        y += 170;
-        hStaticStatus = CreateWindow(L"STATIC", L"Status: Ready. Configure paths and click 'Auto-Scan ROMs'.", WS_CHILD | WS_VISIBLE | SS_LEFTNOWORDWRAP, 20, y, 620, 20, hWnd, (HMENU)IDC_STATIC_STATUS, hInst, NULL);
+        y += 150;
+        hStaticStatus = CreateWindow(L"STATIC", L"Status: Ready. Default MiSTer port is 1999.", WS_CHILD | WS_VISIBLE | SS_LEFTNOWORDWRAP, 20, y, 620, 20, hWnd, (HMENU)IDC_STATIC_STATUS, hInst, NULL);
         break;
     }
 
     case WM_COMMAND: {
         int wmId = LOWORD(wParam);
         switch (wmId) {
-        case IDC_BTN_BROWSE_PCSX2: {
-            auto path = BrowseFile(hWnd, L"PCSX2 Executable (*.exe)\0*.exe\0All Files (*.*)\0*.*\0");
-            if (!path.empty()) SetWindowText(hEditPcsx2Exe, path.c_str());
+        case IDC_BTN_BROWSE_MAME_EXE: {
+            auto path = BrowseFile(hWnd, L"GroovyMAME Executable (*.exe)\0*.exe\0All Files (*.*)\0*.*\0");
+            if (!path.empty()) SetWindowText(hEditMameExe, path.c_str());
             break;
         }
-        case IDC_BTN_BROWSE_PS2ROMS: {
-            auto path = BrowseFolder(hWnd, L"Select PS2 ROMs Folder");
-            if (!path.empty()) SetWindowText(hEditPs2Roms, path.c_str());
+        case IDC_BTN_BROWSE_MAME_ROMS: {
+            auto path = BrowseFolder(hWnd, L"Select GroovyMAME ROMs Folder");
+            if (!path.empty()) SetWindowText(hEditMameRoms, path.c_str());
             break;
         }
         case IDC_BTN_BROWSE_DOLPHIN: {
@@ -444,6 +494,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         case IDC_BTN_BROWSE_NAOMI: {
             auto path = BrowseFolder(hWnd, L"Select Naomi/Arcade ROMs Folder");
             if (!path.empty()) SetWindowText(hEditNaomiRoms, path.c_str());
+            break;
+        }
+        case IDC_BTN_BROWSE_PCSX2: {
+            auto path = BrowseFile(hWnd, L"PCSX2 Executable (*.exe)\0*.exe\0All Files (*.*)\0*.*\0");
+            if (!path.empty()) SetWindowText(hEditPcsx2Exe, path.c_str());
+            break;
+        }
+        case IDC_BTN_BROWSE_PS2ROMS: {
+            auto path = BrowseFolder(hWnd, L"Select PS2 ROMs Folder");
+            if (!path.empty()) SetWindowText(hEditPs2Roms, path.c_str());
             break;
         }
         case IDC_BTN_SAVE_CONFIG:
@@ -503,7 +563,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         L"PhantomArcadeManagerClass",
         L"Phantom Arcade - Groovy_MiSTer Windows Setup & Bridge Manager",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
-        CW_USEDEFAULT, CW_USEDEFAULT, 680, 520,
+        CW_USEDEFAULT, CW_USEDEFAULT, 680, 580,
         NULL, NULL, hInstance, NULL
     );
 

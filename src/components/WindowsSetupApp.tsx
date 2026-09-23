@@ -19,66 +19,93 @@ import {
 export const WindowsSetupApp: React.FC = () => {
   const [viewMode, setViewMode] = useState<'app' | 'source'>('app');
   const [misterIp, setMisterIp] = useState('192.168.1.50');
-  const [udpPort, setUdpPort] = useState('2154');
-  const [pcsx2Exe, setPcsx2Exe] = useState('C:\\Emulators\\PCSX2\\pcsx2-qt.exe');
-  const [ps2Roms, setPs2Roms] = useState('C:\\Games\\PS2');
+  const [udpPort, setUdpPort] = useState('1999');
+  
+  // Emulators
+  const [mameExe, setMameExe] = useState('C:\\Emulators\\GroovyMAME\\groovymame64.exe');
+  const [mameRoms, setMameRoms] = useState('C:\\Emulators\\GroovyMAME\\roms');
   const [dolphinExe, setDolphinExe] = useState('C:\\Emulators\\Dolphin\\Dolphin.exe');
   const [gcRoms, setGcRoms] = useState('C:\\Games\\GameCube');
   const [flycastExe, setFlycastExe] = useState('C:\\Emulators\\Flycast\\flycast.exe');
   const [naomiRoms, setNaomiRoms] = useState('C:\\Games\\Arcade\\Naomi');
+  const [pcsx2Exe, setPcsx2Exe] = useState('C:\\Emulators\\PCSX2\\pcsx2-qt.exe');
+  const [ps2Roms, setPs2Roms] = useState('C:\\Games\\PS2');
 
-  const [statusText, setStatusText] = useState('Ready. Configure paths and click Auto-Scan ROMs.');
+  const [statusText, setStatusText] = useState('Ready. Default MiSTer Groovy port is 1999. Change port anytime.');
   const [isDaemonRunning, setIsDaemonRunning] = useState(false);
   const [scannedGames, setScannedGames] = useState<string[]>([
-    '[PS2] Arcana Heart (ArcanaHeart.iso)',
-    '[PS2] Capcom vs. SNK 2 (CapcomVsSNK2.iso)',
+    '[GroovyMAME] Street Fighter II\' - Champion Edition (sf2ce.zip)',
+    '[GroovyMAME] Metal Slug (mslug.zip)',
+    '[GroovyMAME] The King of Fighters \'98 (kof98.zip)',
     '[GameCube] Super Smash Bros. Melee (SmashMelee.iso)',
     '[Wii] Tatsunoko vs. Capcom (TatsunokoVsCapcom.iso)',
-    '[Naomi] Virtua Fighter 4 Final Tuned (vf4ft.zip)',
-    '[Model 2] Daytona USA (daytona.zip)'
+    '[Naomi] Virtua Fighter 4 Final Tuned (vf4ft.zip)'
   ]);
 
   const [copiedCode, setCopiedCode] = useState(false);
 
   const handleScanRoms = () => {
-    setStatusText('Scanning ROM directories: C:\\Games\\PS2, C:\\Games\\GameCube, C:\\Games\\Arcade...');
+    setStatusText('Scanning ROM directories: GroovyMAME, GameCube, Naomi...');
     setTimeout(() => {
       setScannedGames([
-        '[PS2] Arcana Heart (ArcanaHeart.iso)',
-        '[PS2] Capcom vs. SNK 2 (CapcomVsSNK2.iso)',
-        '[PS2] Melty Blood Actress Again (MeltyBlood.iso)',
-        '[PS2] Tekken 5 (Tekken5.iso)',
+        '[GroovyMAME] Street Fighter II\' - Champion Edition (sf2ce.zip)',
+        '[GroovyMAME] Metal Slug - Super Vehicle-001 (mslug.zip)',
+        '[GroovyMAME] The King of Fighters \'98 (kof98.zip)',
+        '[GroovyMAME] Mortal Kombat II (mk2.zip)',
+        '[GroovyMAME] Pac-Man (pacman.zip)',
         '[GameCube] Super Smash Bros. Melee (SmashMelee.iso)',
         '[GameCube] F-Zero GX (FZeroGX.iso)',
         '[Wii] Tatsunoko vs. Capcom (TatsunokoVsCapcom.iso)',
         '[Naomi] Virtua Fighter 4 Final Tuned (vf4ft.zip)',
-        '[Naomi] Marvel vs. Capcom 2 (mvsc2.zip)',
-        '[Model 2] Daytona USA (daytona.zip)',
-        '[Model 2] Sega Rally Championship (srally.zip)'
+        '[Naomi] Marvel vs. Capcom 2 (mvsc2.zip)'
       ]);
-      setStatusText('Scan complete: 11 ROM files matched and added to catalog.');
+      setStatusText('Scan complete: 10 ROM files matched and added to catalog.');
     }, 400);
   };
 
   const handleTestPing = () => {
-    setStatusText(`Testing UDP handshake with MiSTer at ${misterIp}:${udpPort}...`);
+    const activePort = udpPort.trim() || '1999';
+    setStatusText(`Testing UDP handshake with MiSTer at ${misterIp}:${activePort}...`);
     setTimeout(() => {
-      setStatusText(`MiSTer Handshake Successful! (Ping: 0.42ms · Replied: PONG:PHANTOM_ONLINE)`);
+      setStatusText(`MiSTer Handshake Successful on port ${activePort}! (Ping: 0.38ms · Replied: PONG)`);
+      alert(`MiSTer client acknowledged UDP handshake on port ${activePort}!\nConnected to ${misterIp}:${activePort}`);
     }, 350);
   };
 
   const handleSaveConfig = () => {
+    const activePort = parseInt(udpPort.trim() || '1999', 10);
     const configData = {
       server: {
         listen_ip: '0.0.0.0',
-        udp_port: parseInt(udpPort, 10),
+        udp_port: activePort,
         http_port: 8088,
         mister_client_ip: misterIp
       },
       emulators: {
-        ps2: { exe: pcsx2Exe, args: '-batch -fullscreen -elf "{rom}"', roms_dir: ps2Roms },
-        gamecube: { exe: dolphinExe, args: '-b -e "{rom}"', roms_dir: gcRoms },
-        naomi: { exe: flycastExe, args: '"{rom}"', roms_dir: naomiRoms }
+        groovymame: {
+          exe: mameExe,
+          args: `-video mister -mister_ip ${misterIp} -mister_port ${activePort} "{rom_stem}"`,
+          pipeline: 'Groovy_MiSTer SwitchRes 15kHz Direct',
+          roms_dir: mameRoms
+        },
+        dolphin: {
+          exe: dolphinExe,
+          args: '-b -e "{rom}"',
+          pipeline: 'Groovy_MiSTer 480i/240p',
+          roms_dir: gcRoms
+        },
+        flycast: {
+          exe: flycastExe,
+          args: '"{rom}"',
+          pipeline: 'SwitchRes Direct 15kHz',
+          roms_dir: naomiRoms
+        },
+        pcsx2: {
+          exe: pcsx2Exe,
+          args: '-batch -fullscreen "{rom}"',
+          pipeline: 'Custom Pipeline (Experimental)',
+          roms_dir: ps2Roms
+        }
       }
     };
     const blob = new Blob([JSON.stringify(configData, null, 2)], { type: 'application/json' });
@@ -88,13 +115,14 @@ export const WindowsSetupApp: React.FC = () => {
     a.download = 'phantom_config.json';
     a.click();
     URL.revokeObjectURL(url);
-    setStatusText('Configuration saved to phantom_config.json');
+    setStatusText(`Configuration saved to phantom_config.json (Port ${activePort})`);
   };
 
   const handleToggleDaemon = () => {
+    const activePort = udpPort.trim() || '1999';
     if (!isDaemonRunning) {
       setIsDaemonRunning(true);
-      setStatusText(`Daemon ACTIVE (Listening on UDP 0.0.0.0:${udpPort} · HTTP :8088)`);
+      setStatusText(`Daemon ACTIVE (Listening on UDP 0.0.0.0:${activePort} · HTTP :8088)`);
     } else {
       setIsDaemonRunning(false);
       setStatusText('Daemon Stopped.');
@@ -216,43 +244,57 @@ export const WindowsSetupApp: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
-                  <div className="sm:col-span-4 text-neutral-400">MiSTer FPGA IP Address:</div>
-                  <div className="sm:col-span-5">
+                  <div className="sm:col-span-3 text-neutral-400">MiSTer IP Address:</div>
+                  <div className="sm:col-span-4">
                     <input
                       type="text"
                       value={misterIp}
                       onChange={(e) => setMisterIp(e.target.value)}
                       className="w-full bg-neutral-900 border border-neutral-700 rounded px-2.5 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-amber-400"
+                      placeholder="192.168.1.50"
                     />
                   </div>
+                  <div className="sm:col-span-2 text-neutral-400 text-right">UDP Port:</div>
                   <div className="sm:col-span-3">
                     <input
                       type="text"
                       value={udpPort}
                       onChange={(e) => setUdpPort(e.target.value)}
-                      className="w-full bg-neutral-900 border border-neutral-700 rounded px-2.5 py-1.5 text-neutral-300 font-mono text-xs focus:outline-none focus:border-amber-400"
-                      placeholder="UDP Port"
+                      className="w-full bg-neutral-900 border border-neutral-700 rounded px-2.5 py-1.5 text-amber-300 font-mono text-xs focus:outline-none focus:border-amber-400 font-bold"
+                      placeholder="1999"
                     />
+                    <div className="text-[10px] text-neutral-500 mt-0.5 font-mono">Default: 1999 (Groovy_MiSTer)</div>
                   </div>
                 </div>
               </div>
 
-              {/* Row 2: PCSX2 Configuration */}
-              <div className="space-y-2">
-                <div className="font-semibold text-neutral-200">1. Sony PlayStation 2 (PCSX2 Groovy)</div>
+              {/* Row 2: GroovyMAME Configuration (Direct Native 15kHz Streamer) */}
+              <div className="space-y-2 p-3 bg-amber-500/5 border border-amber-500/20 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="font-bold text-white flex items-center gap-2">
+                    <span>1. GroovyMAME (Native 15kHz CRT Streamer)</span>
+                    <span className="text-[9px] font-mono px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded">
+                      Direct Groovy_MiSTer Protocol
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-neutral-400 font-mono hidden sm:inline">
+                    -video mister -mister_port {udpPort}
+                  </span>
+                </div>
+                
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                   <div className="sm:col-span-3 text-neutral-400 text-[11px]">Executable (.exe):</div>
                   <div className="sm:col-span-7">
                     <input
                       type="text"
-                      value={pcsx2Exe}
-                      onChange={(e) => setPcsx2Exe(e.target.value)}
+                      value={mameExe}
+                      onChange={(e) => setMameExe(e.target.value)}
                       className="w-full bg-neutral-950 border border-neutral-800 rounded px-2 py-1 text-neutral-300 font-mono text-[11px]"
                     />
                   </div>
                   <div className="sm:col-span-2">
                     <button 
-                      onClick={() => setPcsx2Exe('C:\\Emulators\\PCSX2\\pcsx2-qt.exe')}
+                      onClick={() => setMameExe('C:\\Emulators\\GroovyMAME\\groovymame64.exe')}
                       className="w-full py-1 bg-neutral-800 hover:bg-neutral-700 rounded text-neutral-300 text-[11px] cursor-pointer"
                     >
                       Browse...
@@ -261,18 +303,18 @@ export const WindowsSetupApp: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-                  <div className="sm:col-span-3 text-neutral-400 text-[11px]">ROMs Folder (.iso/.chd):</div>
+                  <div className="sm:col-span-3 text-neutral-400 text-[11px]">MAME ROMs (.zip/.7z):</div>
                   <div className="sm:col-span-7">
                     <input
                       type="text"
-                      value={ps2Roms}
-                      onChange={(e) => setPs2Roms(e.target.value)}
+                      value={mameRoms}
+                      onChange={(e) => setMameRoms(e.target.value)}
                       className="w-full bg-neutral-950 border border-neutral-800 rounded px-2 py-1 text-neutral-300 font-mono text-[11px]"
                     />
                   </div>
                   <div className="sm:col-span-2">
                     <button 
-                      onClick={() => setPs2Roms('C:\\Games\\PS2')}
+                      onClick={() => setMameRoms('C:\\Emulators\\GroovyMAME\\roms')}
                       className="w-full py-1 bg-neutral-800 hover:bg-neutral-700 rounded text-neutral-300 text-[11px] cursor-pointer"
                     >
                       Browse...
@@ -283,7 +325,7 @@ export const WindowsSetupApp: React.FC = () => {
 
               {/* Row 3: Dolphin Configuration */}
               <div className="space-y-2 pt-1 border-t border-neutral-800/60">
-                <div className="font-semibold text-neutral-200">2. Nintendo GameCube & Wii (Dolphin CRT)</div>
+                <div className="font-semibold text-neutral-200">2. Nintendo GameCube & Wii (Dolphin)</div>
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                   <div className="sm:col-span-3 text-neutral-400 text-[11px]">Executable (.exe):</div>
                   <div className="sm:col-span-7">

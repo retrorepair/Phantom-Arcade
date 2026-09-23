@@ -37,7 +37,7 @@ import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # Server Configuration
-UDP_PORT = 2154
+UDP_PORT = 1999
 HTTP_PORT = 8088
 CONFIG_FILE = "phantom_config.json"
 GAMES_CATALOG_FILE = "games_catalog.json"
@@ -56,7 +56,12 @@ def load_catalog():
 def load_config():
     default_config = {
         "mister_ip": "192.168.1.50",
+        "udp_port": 1999,
         "emulators": {
+            "mame": {
+                "exe": "C:\\\\Emulators\\\\GroovyMAME\\\\groovymame64.exe",
+                "args": "-video mister -mister_ip {mister_ip} -mister_port {udp_port} \\\"{rom_stem}\\\""
+            },
             "ps2": {
                 "exe": "C:\\\\Emulators\\\\PCSX2\\\\pcsx2-qt.exe",
                 "args": "-batch -fullscreen -elf \\"{rom}\\""
