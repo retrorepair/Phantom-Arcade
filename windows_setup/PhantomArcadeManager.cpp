@@ -605,11 +605,6 @@ std::atomic<bool> g_launchInProgress(false);
 bool ExecuteLaunchProcess(const std::string& gameId, const std::wstring& targetMisterIp) {
     g_launchInProgress.store(false); // Reset guard once launched
 
-    // Aggressively kill any existing MAME/RetroArch instances to ensure single process state
-    system("taskkill /f /im mame.exe 2>nul");
-    system("taskkill /f /im groovymame.exe 2>nul");
-    system("taskkill /f /im retroarch.exe 2>nul");
-
     if (g_activePid > 0) {
         HANDLE hOld = OpenProcess(PROCESS_TERMINATE, FALSE, g_activePid);
         if (hOld) {
@@ -660,9 +655,6 @@ bool ExecuteLaunchProcess(const std::string& gameId, const std::wstring& targetM
             return true;
         }
     }
-
-    // Set MISTER_IP environment variable for SwitchRes video mister backend
-    SetEnvironmentVariableW(L"MISTER_IP", misterIp.c_str());
 
     // Default to GroovyMAME with Calamity 15kHz MiSTer Video Streaming & Dynamic SwitchRes (Full screen stretch without side pillarbox black bars)
     std::wstring wStem = StringToWstring(stem);
