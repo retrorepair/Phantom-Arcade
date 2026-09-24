@@ -726,14 +726,15 @@ static DWORD WINAPI DelayedLaunchWorker(LPVOID lpParam) {
     std::wstring ip = params->misterIp;
     delete params;
 
-    if (delay < 6) delay = 6; // Enforce minimum 6 seconds
-
-    for (int s = delay; s > 0; --s) {
-        std::wstring st = L"Status: [WAITING] FPGA reconfiguring Groovy.rbf... Launching PC stream in " + std::to_wstring(s) + L"s";
-        SetWindowText(hStaticStatus, st.c_str());
-        Sleep(1000);
+    if (delay > 0) {
+        for (int s = delay; s > 0; --s) {
+            std::wstring st = L"Status: Launching PC stream in " + std::to_wstring(s) + L"s...";
+            SetWindowText(hStaticStatus, st.c_str());
+            Sleep(1000);
+        }
     }
-    SetWindowText(hStaticStatus, L"Status: FPGA core ready. Launching GroovyMAME stream now...");
+
+    SetWindowText(hStaticStatus, L"Status: Launching GroovyMAME stream to MiSTer GroovyNLC core...");
     ExecuteLaunchProcess(gid, ip);
     return 0;
 }
@@ -763,7 +764,7 @@ bool LaunchGame(const std::string& gameId, const std::wstring& targetMisterIp) {
             try { delaySec = std::stoi(dStr); } catch (...) {}
         }
     }
-    if (delaySec < 6) delaySec = 6;
+    if (delaySec < 0) delaySec = 0;
 
     LaunchTaskParams* params = new LaunchTaskParams{ gameId, targetMisterIp, delaySec };
     HANDLE hThread = CreateThread(NULL, 0, DelayedLaunchWorker, params, 0, NULL);
