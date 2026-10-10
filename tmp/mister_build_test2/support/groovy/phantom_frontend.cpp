@@ -78,6 +78,9 @@ static int game_count = 0;
 static int selected_idx = 0;
 static int current_cat = 0;
 static int is_launching = 0;
+static int game_session_active = 0;
+static int exit_hotkey_sent = 0;
+static uint32_t exit_hotkey_start_ms = 0;
 static uint32_t launch_start_time = 0;
 
 static char pc_server_ip[64] = DEFAULT_PC_IP;
@@ -302,6 +305,27 @@ static void send_udp_launch(const char *game_id) {
     close(s);
 }
 
+static void send_udp_kill(void) {
+    if (pc_server_ip[0] == '\0') return;
+
+    int s = socket(AF_INET, SOCK_DGRAM, 0);
+    if (s < 0) return;
+
+    struct sockaddr_in serv;
+    memset(&serv, 0, sizeof(serv));
+    serv.sin_family = AF_INET;
+    serv.sin_addr.s_addr = inet_addr(pc_server_ip);
+
+    const char packet[] = "KILL";
+    serv.sin_port = htons(pc_udp_port);
+    sendto(s, packet, sizeof(packet) - 1, 0, (struct sockaddr*)&serv, sizeof(serv));
+
+    // Preserve compatibility with the legacy Groovy_MiSTer control port.
+    serv.sin_port = htons(32105);
+    sendto(s, packet, sizeof(packet) - 1, 0, (struct sockaddr*)&serv, sizeof(serv));
+    close(s);
+}
+
 void phantom_frontend_init() {
     load_config();
     init_catalog();
@@ -311,11 +335,19 @@ void phantom_frontend_init() {
 }
 
 void phantom_frontend_on_connect() {
+    // A stream connection means a game session is active: never treat gameplay
+    // controls as frontend navigation or as another game-launch request.
+    game_session_active = 1;
     is_launching = 0;
+    exit_hotkey_sent = 0;
+    exit_hotkey_start_ms = 0;
 }
 
 void phantom_frontend_on_disconnect() {
+    game_session_active = 0;
     is_launching = 0;
+    exit_hotkey_sent = 0;
+    exit_hotkey_start_ms = 0;
     save_state();
     marquee_timer_origin = get_time_ms();
     marquee_last_selected = selected_idx;
@@ -469,8 +501,27 @@ static void trigger_launch() {
 }
 
 void phantom_frontend_input_joystick(unsigned char joystick, uint32_t map) {
-    if (is_launching) return;
     (void)joystick;
+
+    // During gameplay, swallow frontend actions. The only frontend command
+    // permitted is the documented Start + Coin exit chord held for 1.2 seconds.
+    if (game_session_active) {
+        const int start = (map & (1u << 9)) != 0;
+        const int coin = (map & (1u << 8)) != 0;
+        if (start && coin) {
+            uint32_t now = get_time_ms();
+            if (exit_hotkey_start_ms == 0) exit_hotkey_start_ms = now;
+            if (!exit_hotkey_sent && (uint32_t)(now - exit_hotkey_start_ms) >= 1200) {
+                exit_hotkey_sent = 1;
+                send_udp_kill();
+            }
+        } else {
+            exit_hotkey_start_ms = 0;
+            exit_hotkey_sent = 0;
+        }
+        return;
+    }
+    if (is_launching) return;
 
     // Standard MiSTer joystick bitmask:
     // bit 0: Right, bit 1: Left, bit 2: Down, bit 3: Up
@@ -554,7 +605,7 @@ void phantom_frontend_input_analog(unsigned char joystick, unsigned char analog,
 }
 
 void phantom_frontend_input_keyboard(uint16_t key, int press) {
-    if (is_launching || !press) return;
+    if (game_session_active || is_launching || !press) return;
 
     // Key codes from Linux / MiSTer:
     // Up: 103, Down: 108, Left: 105, Right: 106, Enter: 28, Space: 57, ESC: 1

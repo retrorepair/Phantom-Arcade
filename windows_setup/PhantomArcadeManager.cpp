@@ -600,19 +600,40 @@ void ScanRomDirectories() {
 }
 
 std::atomic<bool> g_launchInProgress(false);
+static std::atomic<unsigned long long> g_launchGeneration(0);
+
+// Returns true while the process tracked as the active emulator is still alive.
+// If its state cannot be determined safely, fail closed and reject another launch.
+static bool TrackedEmulatorIsRunning() {
+    const DWORD pid = g_activePid.load();
+    if (pid == 0) return false;
+
+    HANDLE process = OpenProcess(SYNCHRONIZE, FALSE, pid);
+    if (!process) {
+        const DWORD error = GetLastError();
+        if (error == ERROR_INVALID_PARAMETER) {
+            g_activePid.store(0); // PID no longer exists
+            return false;
+        }
+        return true;
+    }
+
+    const DWORD state = WaitForSingleObject(process, 0);
+    CloseHandle(process);
+    if (state == WAIT_OBJECT_0) {
+        g_activePid.store(0);
+        return false;
+    }
+    return true; // WAIT_TIMEOUT, or an indeterminate state: fail closed
+}
 
 // Internal helper that actually spawns GroovyMAME / RetroArch after delay
 bool ExecuteLaunchProcess(const std::string& gameId, const std::wstring& targetMisterIp) {
-    g_launchInProgress.store(false); // Reset guard once launched
-
-    if (g_activePid > 0) {
-        HANDLE hOld = OpenProcess(PROCESS_TERMINATE, FALSE, g_activePid);
-        if (hOld) {
-            TerminateProcess(hOld, 0);
-            CloseHandle(hOld);
-        }
-        g_activePid = 0;
-        Sleep(150);
+    // Never terminate/replace an emulator as a side effect of a new launch packet.
+    if (TrackedEmulatorIsRunning()) {
+        SetWindowText(hStaticStatus, L"Status: Launch rejected; an emulator is already running. Send KILL first.");
+        g_launchInProgress.store(false);
+        return false;
     }
 
     std::wstring misterIp = targetMisterIp.empty() ? GetText(hEditMisterIp) : targetMisterIp;
@@ -652,6 +673,7 @@ bool ExecuteLaunchProcess(const std::string& gameId, const std::wstring& targetM
             CloseHandle(pi.hThread);
             CloseHandle(pi.hProcess);
             SetWindowText(hStaticStatus, (L"Status: RetroArch launched (" + StringToWstring(raStem) + L")").c_str());
+            g_launchInProgress.store(false);
             return true;
         }
     }
@@ -704,11 +726,13 @@ bool ExecuteLaunchProcess(const std::string& gameId, const std::wstring& targetM
 
         std::wstring stat = L"Status: [RUNNING] GroovyMAME (" + wStem + L") -> Streaming to MiSTer (" + misterIp + L":" + std::to_wstring(port) + L")";
         SetWindowText(hStaticStatus, stat.c_str());
+        g_launchInProgress.store(false);
         return true;
     } else {
         DWORD err = GetLastError();
         std::wstring stat = L"Status: Could not launch MAME (Error " + std::to_wstring(err) + L"). Check MAME executable path!";
         SetWindowText(hStaticStatus, stat.c_str());
+        g_launchInProgress.store(false);
         return false;
     }
 }
@@ -717,6 +741,7 @@ struct LaunchTaskParams {
     std::string gameId;
     std::wstring misterIp;
     int delaySec;
+    unsigned long long generation;
 };
 
 static DWORD WINAPI DelayedLaunchWorker(LPVOID lpParam) {
@@ -724,16 +749,19 @@ static DWORD WINAPI DelayedLaunchWorker(LPVOID lpParam) {
     int delay = params->delaySec;
     std::string gid = params->gameId;
     std::wstring ip = params->misterIp;
+    const unsigned long long generation = params->generation;
     delete params;
 
     if (delay > 0) {
         for (int s = delay; s > 0; --s) {
+            if (g_launchGeneration.load() != generation) return 0; // Cancelled by KILL
             std::wstring st = L"Status: Launching PC stream in " + std::to_wstring(s) + L"s...";
             SetWindowText(hStaticStatus, st.c_str());
             Sleep(1000);
         }
     }
 
+    if (g_launchGeneration.load() != generation) return 0; // Cancelled before process creation
     SetWindowText(hStaticStatus, L"Status: Launching GroovyMAME stream to MiSTer GroovyNLC core...");
     ExecuteLaunchProcess(gid, ip);
     return 0;
@@ -754,7 +782,13 @@ bool LaunchGame(const std::string& gameId, const std::wstring& targetMisterIp) {
         SetWindowText(hStaticStatus, L"Status: Launch already in progress. Please wait...");
         return false;
     }
+    if (TrackedEmulatorIsRunning()) {
+        LeaveCriticalSection(&cs);
+        SetWindowText(hStaticStatus, L"Status: Launch rejected; an emulator is already running. Send KILL first.");
+        return false;
+    }
     g_launchInProgress.store(true);
+    const unsigned long long generation = g_launchGeneration.fetch_add(1) + 1;
     LeaveCriticalSection(&cs);
 
     int delaySec = 6;
@@ -766,7 +800,7 @@ bool LaunchGame(const std::string& gameId, const std::wstring& targetMisterIp) {
     }
     if (delaySec < 0) delaySec = 0;
 
-    LaunchTaskParams* params = new LaunchTaskParams{ gameId, targetMisterIp, delaySec };
+    LaunchTaskParams* params = new LaunchTaskParams{ gameId, targetMisterIp, delaySec, generation };
     HANDLE hThread = CreateThread(NULL, 0, DelayedLaunchWorker, params, 0, NULL);
     if (hThread) {
         CloseHandle(hThread);
@@ -904,11 +938,15 @@ DWORD WINAPI DaemonThreadProc(LPVOID lpParam) {
                 }
 
                 // Call LaunchGame directly — LaunchGame handles the single unified delayed worker thread safely
-                LaunchGame(gameId, misterClientIp);
-
-                std::string reply = "ACK:LAUNCH:OK:" + gameId;
+                const bool accepted = LaunchGame(gameId, misterClientIp);
+                std::string reply = accepted
+                    ? "ACK:LAUNCH:OK:" + gameId
+                    : "ACK:LAUNCH:BUSY:" + gameId;
                 sendto(g_udpSocket, reply.c_str(), (int)reply.length(), 0, (sockaddr*)&clientAddr, clientLen);
             } else if (msg == "KILL") {
+                // Invalidate any delayed launch so it cannot start after the user exits.
+                g_launchGeneration.fetch_add(1);
+                g_launchInProgress.store(false);
                 if (g_activePid > 0) {
                     HANDLE hProc = OpenProcess(PROCESS_TERMINATE, FALSE, g_activePid);
                     if (hProc) {
