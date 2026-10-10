@@ -605,7 +605,7 @@ void phantom_frontend_input_analog(unsigned char joystick, unsigned char analog,
 }
 
 void phantom_frontend_input_keyboard(uint16_t key, int press) {
-    if (is_launching || !press) return;
+    if (game_session_active || is_launching || !press) return;
 
     // Key codes from Linux / MiSTer:
     // Up: 103, Down: 108, Left: 105, Right: 106, Enter: 28, Space: 57, ESC: 1
